@@ -1,4 +1,4 @@
-import * as Sketch from "./sketches/moving_plane_shaded.js";
+import * as Sketch from "./sketches/yegor_painting_morph.js";
 import * as twgl from "./twgl-full.js";
 
 // Write Javascript code!
