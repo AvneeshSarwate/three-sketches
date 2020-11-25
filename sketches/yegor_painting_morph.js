@@ -1,64 +1,93 @@
 import * as THREE from "../three.module.js";
 import Stats from "../stats.module.js";
 
-let camera, scene, renderer, stats, texture;
+let camera, scene, renderer, stats;
 
-let uniforms, mesh;
+let startTime = performance.now()/1000;
+let uniforms, time;
+
+let gridSize = 10;
+
+let lerp = (v1, v2, a) => (1 - a) * v1 + a * v2;
+
+function createTile(i, j, gridSize, referenceMaterial, painting_texture) {
+    let tileSize = 2 / gridSize * 0.9;
+    const geometry = new THREE.PlaneBufferGeometry(tileSize, tileSize);
+    const newMaterial = referenceMaterial.clone();
+
+    newMaterial.uniforms.xInd = { value: i };
+    newMaterial.uniforms.yInd = { value: j };
+    newMaterial.uniforms.gridSize = { value: gridSize };
+    newMaterial.uniforms.painting = { value: painting_texture };
+
+    let tileMesh = new THREE.Mesh(geometry, newMaterial);
+    let xRoot = tileMesh.position.x = lerp(-1, 1, i / gridSize) + tileSize / 2;
+    let yRoot = tileMesh.position.y = lerp(-1, 1, j / gridSize) + tileSize / 2;
+    tileMesh.position.z = 0;
+
+    tileMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group){
+        let cellPhase = (i*1.3*gridSize + j*.76) * 3.14 * 0.134;
+        tileMesh.position.x = xRoot + Math.cos(time + cellPhase)*(1/gridSize/2);
+        tileMesh.position.y = yRoot + Math.cos(time + cellPhase)*(1/gridSize/2);
+    }
+
+    return tileMesh;
+}
 
 function init() {
-  const container = document.getElementById("container");
+    const container = document.getElementById("container");
 
-  camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-  scene = new THREE.Scene();
+    scene = new THREE.Scene();
 
-  const geometry = new THREE.PlaneBufferGeometry(0.8, 0.8);
+    const painting_texture = new THREE.TextureLoader().load("./sketches/yegor_painting.jpg");
 
-  const painting_texture = new THREE.TextureLoader().load( "./sketches/yegor_painting.jpg" );
+    uniforms = {
+        time: { value: 1.0 },
+        xInd: { value: 0 },
+        yInd: { value: 0 },
+        gridSize: { value: 3 },
+        painting: { value: painting_texture }
+    };
 
-  uniforms = {
-    time: { value: 1.0 },
-    painting: {value: painting_texture}
-  };
+    const material = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader
+    });
 
-  const material = new THREE.ShaderMaterial({
-    uniforms: uniforms,
-    vertexShader: vertexShader,
-    fragmentShader: fragmentShader
-  });
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            scene.add(createTile(i, j, gridSize, material, painting_texture));
+        }
+    }
 
-  mesh = new THREE.Mesh(geometry, material);
-  scene.add(mesh);
+    renderer = new THREE.WebGLRenderer();
+    renderer.setPixelRatio(window.devicePixelRatio / 2);
+    container.appendChild(renderer.domElement);
 
-  renderer = new THREE.WebGLRenderer();
-  renderer.setPixelRatio(window.devicePixelRatio / 2);
-  container.appendChild(renderer.domElement);
+    onWindowResize();
 
-  onWindowResize();
+    stats = new Stats();
+    container.appendChild(stats.dom);
 
-  stats = new Stats();
-  container.appendChild(stats.dom);
-
-  window.addEventListener("resize", onWindowResize, false);
+    window.addEventListener("resize", onWindowResize, false);
 }
 
 function onWindowResize() {
-  renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 //
 
 function animate() {
-  requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
 
-  let time = performance.now() / 1000;
+    time = performance.now() / 1000 - startTime;
 
-  uniforms["time"].value = time;
-
-  mesh.position.x = Math.sin(time) * 0.1;
-
-  renderer.render(scene, camera);
-  stats.update();
+    renderer.render(scene, camera);
+    stats.update();
 }
 
 export { init, animate };
@@ -81,9 +110,15 @@ varying vec2 vUv;
 uniform float time;
 uniform sampler2D painting;
 
+float sinN(float n){
+    return (sin(n)+1.)/2.;
+}
+
 void main()	{
 
-  gl_FragColor = texture(painting, vUv);
+  vec4 paintCell = texture(painting, vUv);
+
+  gl_FragColor = paintCell;
 
 }
 `;
