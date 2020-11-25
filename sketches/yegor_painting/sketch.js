@@ -6,13 +6,21 @@ let camera, scene, renderer, stats;
 let startTime = performance.now()/1000;
 let uniforms, time;
 
-let gridSize = 40;
+let gridSize = Math.floor(4 + (1- Math.random()**2)*36);
 
 let lerp = (v1, v2, a) => (1 - a) * v1 + a * v2;
+let sinN = n => (Math.sin(n)+1/2);
+
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
 
 function createTile(i, j, gridSize, referenceMaterial, painting_texture) {
     let tileSize = 2 / gridSize * 0.9;
-    const geometry = new THREE.PlaneBufferGeometry(tileSize, tileSize);
+    const geometry = new THREE.CircleBufferGeometry(tileSize, 32);
     const newMaterial = referenceMaterial.clone();
 
     newMaterial.uniforms.xInd = { value: i };
@@ -31,6 +39,7 @@ function createTile(i, j, gridSize, referenceMaterial, painting_texture) {
     tileMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group){
         tileMesh.position.x = xRoot + Math.cos(time + cellPhase)*(1/gridSize/2) * dev;
         tileMesh.position.y = yRoot + Math.cos(time + cellPhase)*(1/gridSize/2) * dev;
+        tileMesh.scale.x = tileMesh.scale.y = 0.5 + sinN(time * dev);
     }
 
     return tileMesh;
@@ -59,11 +68,19 @@ function init() {
         fragmentShader: fragmentShader
     });
 
+    let meshes = [];
+
     for (let i = 0; i < gridSize; i++) {
         for (let j = 0; j < gridSize; j++) {
-            scene.add(createTile(i, j, gridSize, material, painting_texture));
+            meshes.push(createTile(i, j, gridSize, material, painting_texture));
         }
     }
+
+
+    meshes.forEach(mesh => {
+        mesh.renderOrder = Math.random();
+        scene.add(mesh);
+    });
 
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio(window.devicePixelRatio / 2);
