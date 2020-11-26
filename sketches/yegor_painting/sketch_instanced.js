@@ -6,7 +6,7 @@ let camera, scene, renderer, stats;
 let startTime = performance.now()/1000;
 let uniforms, time;
 
-let gridSize = 2; Math.floor(4 + (1- Math.random()**2)*36);
+let gridSize = 4; Math.floor(4 + (1- Math.random()**2)*36);
 
 
 function init() {
@@ -17,7 +17,8 @@ function init() {
 
     const tileSize = 2 / gridSize * 0.9;
     let geometry = new THREE.CircleBufferGeometry(tileSize, 32);
-    // geometry = new THREE.PlaneBufferGeometry(2/gridSize, 2/gridSize);
+    // let geometry = new THREE.PlaneBufferGeometry(2/gridSize, 2/gridSize);
+    // let geometry = new THREE.SphereBufferGeometry(tileSize, 10, 10);
 
     const vertices = new Float32Array( [
         -1.0, -1.0,  1.0,
@@ -106,11 +107,16 @@ attribute float yInd;
 uniform float gridSize;
 uniform float time;
 
+//convert grid index of circle geometry to normalized circle position
+float ind2pos(float i){
+    return mix(-1., 1., i/gridSize) + 0.5/gridSize;
+}
+
 void main()	{
 
   vUv = uv;
 
-  vec3 dev = vec3(mix(-1., 1., xInd/gridSize), mix(-1., 1., yInd/gridSize), 0.);
+  vec3 dev = vec3(ind2pos(xInd), ind2pos(yInd), 0.);
   vec3 dev_debug = vec3(mix(-.1, .1, xInd/gridSize), mix(-.1, .1, yInd/gridSize), 0.);
   vec3 p = position + dev;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0 );
@@ -136,9 +142,10 @@ void main()	{
 
   vec2 cellCoord = vec2(xInd_v/gridSize + vUv.x/gridSize, yInd_v/gridSize + vUv.y/gridSize);
   vec4 paintCell = texture(painting, cellCoord);
-  vec4 debugColor = vec4(xInd_v, yInd_v, 0.5, 1);
+  vec4 debugColor = vec4(xInd_v/gridSize, yInd_v/gridSize, 0.5, 1);
+  vec4 debugColor2 = vec4(cellCoord.x, cellCoord.y, 0.5, 1);
 
-  gl_FragColor = debugColor;
+  gl_FragColor = paintCell;
 
 }
 `;
