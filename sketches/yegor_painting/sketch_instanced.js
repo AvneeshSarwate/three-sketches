@@ -6,52 +6,36 @@ let camera, scene, renderer, stats;
 let startTime = performance.now()/1000;
 let uniforms, time;
 
-let gridSize = Math.floor(4 + (1- Math.random()**2)*36);
+let gridSize = 2; Math.floor(4 + (1- Math.random()**2)*36);
 
-let lerp = (v1, v2, a) => (1 - a) * v1 + a * v2;
-let sinN = n => (Math.sin(n)+1/2);
-
-function createTile(i, j, gridSize, referenceMaterial, painting_texture) {
-    let tileSize = 2 / gridSize * 0.9;
-    const geometry = new THREE.CircleBufferGeometry(tileSize, 32);
-    const newMaterial = referenceMaterial.clone();
-
-    newMaterial.uniforms.xInd = { value: i };
-    newMaterial.uniforms.yInd = { value: j };
-    newMaterial.uniforms.gridSize = { value: gridSize };
-    newMaterial.uniforms.painting = { value: painting_texture };
-
-    let tileMesh = new THREE.Mesh(geometry, newMaterial);
-    let xRoot = tileMesh.position.x = lerp(-1, 1, i / gridSize) + tileSize / 2;
-    let yRoot = tileMesh.position.y = lerp(-1, 1, j / gridSize) + tileSize / 2;
-    tileMesh.position.z = 0;
-
-    let cellPhase = Math.random()*Math.PI*2;
-    let dev = Math.random() * 5;
-
-    tileMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group){
-        tileMesh.position.x = xRoot + Math.cos(time + cellPhase)*(1/gridSize/2) * dev;
-        tileMesh.position.y = yRoot + Math.cos(time + cellPhase)*(1/gridSize/2) * dev;
-        tileMesh.scale.x = tileMesh.scale.y = 0.5 + sinN(time * dev);
-    }
-
-    return tileMesh;
-}
 
 function init() {
     const container = document.getElementById("container");
 
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
     scene = new THREE.Scene();
+
+    const tileSize = 2 / gridSize * 0.9;
+    let geometry = new THREE.CircleBufferGeometry(tileSize, 32);
+    // geometry = new THREE.PlaneBufferGeometry(2/gridSize, 2/gridSize);
+
+    const vertices = new Float32Array( [
+        -1.0, -1.0,  1.0,
+         1.0, -1.0,  1.0,
+         1.0,  1.0,  1.0,
+    
+         1.0,  1.0,  1.0,
+        -1.0,  1.0,  1.0,
+        -1.0, -1.0,  1.0
+    ] );
+
+    const geometryInstanced = new THREE.InstancedBufferGeometry();
 
     const painting_texture = new THREE.TextureLoader().load("./yegor_painting.jpg");
 
     uniforms = {
         time: { value: 1.0 },
-        xInd: { value: 0 },
-        yInd: { value: 0 },
-        gridSize: { value: 1 },
+        gridSize: { value: gridSize },
         painting: { value: painting_texture }
     };
 
@@ -61,19 +45,26 @@ function init() {
         fragmentShader: fragmentShader
     });
 
-    let meshes = [];
+    let positions = geometry.attributes.position.array;
+    let xIndices = [];
+    let yIndices = [];
 
     for (let i = 0; i < gridSize; i++) {
         for (let j = 0; j < gridSize; j++) {
-            meshes.push(createTile(i, j, gridSize, material, painting_texture));
+            xIndices.push(i);
+            yIndices.push(j);
         }
     }
 
+    geometryInstanced.setAttribute('position', geometry.attributes.position);
+    geometryInstanced.setAttribute('normal', geometry.attributes.normal);
+    geometryInstanced.setAttribute('uv', geometry.attributes.uv);
+    geometryInstanced.setAttribute('xInd', new THREE.InstancedBufferAttribute(new Float32Array(xIndices), 1))
+    geometryInstanced.setAttribute('yInd', new THREE.InstancedBufferAttribute(new Float32Array(yIndices), 1))
 
-    meshes.forEach(mesh => {
-        mesh.renderOrder = Math.random();
-        scene.add(mesh);
-    });
+    const mesh = new THREE.Mesh(geometryInstanced, material);
+    scene.add(mesh);
+    
 
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio(window.devicePixelRatio / 2);
@@ -106,23 +97,35 @@ export { init, animate };
 
 let vertexShader = `
 varying vec2 vUv;
+varying float xInd_v;
+varying float yInd_v;
+
+attribute float xInd;
+attribute float yInd;
+
+uniform float gridSize;
+uniform float time;
 
 void main()	{
 
   vUv = uv;
 
-  vec3 p = position;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-
+  vec3 dev = vec3(mix(-1., 1., xInd/gridSize), mix(-1., 1., yInd/gridSize), 0.);
+  vec3 dev_debug = vec3(mix(-.1, .1, xInd/gridSize), mix(-.1, .1, yInd/gridSize), 0.);
+  vec3 p = position + dev;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0 );
+  
+  xInd_v = xInd;
+  yInd_v = yInd;
 }`;
 
 let fragmentShader = `
 varying vec2 vUv;
+varying float xInd_v;
+varying float yInd_v;
 
 uniform float time;
 uniform sampler2D painting;
-uniform float xInd;
-uniform float yInd;
 uniform float gridSize;
 
 float sinN(float n){
@@ -131,10 +134,11 @@ float sinN(float n){
 
 void main()	{
 
-  vec2 cellCoord = vec2(xInd/gridSize + vUv.x/gridSize, yInd/gridSize + vUv.y/gridSize);
+  vec2 cellCoord = vec2(xInd_v/gridSize + vUv.x/gridSize, yInd_v/gridSize + vUv.y/gridSize);
   vec4 paintCell = texture(painting, cellCoord);
+  vec4 debugColor = vec4(xInd_v, yInd_v, 0.5, 1);
 
-  gl_FragColor = paintCell;
+  gl_FragColor = debugColor;
 
 }
 `;
