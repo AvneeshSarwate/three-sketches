@@ -74,8 +74,10 @@ function init() {
 
     let useCircleGeometry = true;
     if(useCircleGeometry){
-        let geo2 = new THREE.CircleBufferGeometry(0.25, 32);
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(geo2.attributes.position.array, 3));
+        let geo2 = new THREE.CircleGeometry(0.25, 32); //instead of CircleBufferGeometry
+        // let geo2 = new THREE.PlaneGeometry(0.25, 0.25, 10, 10); //instead of PlaneBufferGeometry
+        // geometry.setAttribute('position', new THREE.Float32BufferAttribute(geo2.attributes.position.array, 3));
+        geometry.fromGeometry(geo2);
     } else {
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));   
     }

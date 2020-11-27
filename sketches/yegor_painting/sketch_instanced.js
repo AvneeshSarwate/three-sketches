@@ -20,7 +20,7 @@ function init() {
     scene = new THREE.Scene();
 
     const tileSize = 2 / gridSize * 0.9;
-    let geometry = new THREE.CircleBufferGeometry(tileSize/2, 8);
+    let geometry = new THREE.CircleGeometry(tileSize/2, 8);
     // let geometry = new THREE.PlaneBufferGeometry(2/gridSize, 2/gridSize);
     // let geometry = new THREE.SphereBufferGeometry(tileSize, 10, 10);
 
@@ -42,7 +42,7 @@ function init() {
         fragmentShader: fragmentShader
     });
 
-    let positions = geometry.attributes.position.array;
+    // let positions = geometry.attributes.position.array;
     let xIndices = [];
     let yIndices = [];
 
@@ -53,9 +53,10 @@ function init() {
         }
     }
 
-    geometryInstanced.setAttribute('position', geometry.attributes.position);
-    geometryInstanced.setAttribute('normal', geometry.attributes.normal);
-    geometryInstanced.setAttribute('uv', geometry.attributes.uv);
+    geometryInstanced.fromGeometry(geometry);
+    // geometryInstanced.setAttribute('position', geometry.attributes.position);
+    // geometryInstanced.setAttribute('normal', geometry.attributes.normal);
+    // geometryInstanced.setAttribute('uv', geometry.attributes.uv);
     geometryInstanced.setAttribute('xInd', new THREE.InstancedBufferAttribute(new Float32Array(xIndices), 1))
     geometryInstanced.setAttribute('yInd', new THREE.InstancedBufferAttribute(new Float32Array(yIndices), 1))
 
