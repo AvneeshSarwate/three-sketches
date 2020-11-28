@@ -10,7 +10,7 @@ let camera, scene, renderer, stats;
 let startTime = performance.now()/1000;
 let uniforms, time;
 
-let gridSize = 4; Math.floor(4 + (1- Math.random()**2)*36);
+let gridSize = 100; Math.floor(4 + (1- Math.random()**2)*36);
 
 
 function init() {
@@ -20,7 +20,7 @@ function init() {
     scene = new THREE.Scene();
 
     const tileSize = 2 / gridSize * 0.9;
-    let geometry = new THREE.CircleGeometry(tileSize/2, 8);
+    let geometry = new THREE.CircleGeometry(tileSize*1, 32);
     // let geometry = new THREE.PlaneBufferGeometry(2/gridSize, 2/gridSize);
     // let geometry = new THREE.SphereBufferGeometry(tileSize, 10, 10);
 
@@ -28,7 +28,7 @@ function init() {
 
     const geometryInstanced = new THREE.InstancedBufferGeometry();
 
-    const painting_texture = new THREE.TextureLoader().load("https://i.imgur.com/DYbJ6X2.jpeg");
+    const painting_texture = new THREE.TextureLoader().load("./yegor_painting.jpg");
 
     uniforms = {
         time: { value: 1.0 },
@@ -110,6 +110,8 @@ float ind2pos(float i){
     return mix(-1., 1., i/gridSize) + 1./gridSize;
 }
 
+float sinN(float n){ return (sin(n)+1.)/2.;}
+
 void main()	{
 
   vUv = uv;
@@ -118,8 +120,10 @@ void main()	{
 
   vec3 dev = vec3(ind2pos(xInd), ind2pos(yInd), 0.);
   vec3 dev_debug = vec3(mix(-.1, .1, xInd/gridSize), mix(-.1, .1, yInd/gridSize), 0.);
-  vec3 dev_debug2 = vec3(sin(time+indN*3.1415), cos(time+indN*3.1415), 0)*0.1;
-  vec3 p = position + dev + dev_debug2 + vec3(0, 0, -0.01);
+  vec3 dev_debug2 =  vec3(sin(time+indN*3.1415), cos(time+indN*3.1415), 0)*0.1;
+
+  vec3 motion = vec3(sin(time*(1.+indN*3.)), cos(time*(1.+indN*1.)), 0)*0.1;
+  vec3 p = position + dev + mix(motion, vec3(0), pow(sinN(time+yInd/gridSize*3.1415), 6.));
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0 );
   
   xInd_v = xInd;
