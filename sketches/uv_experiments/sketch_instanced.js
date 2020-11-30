@@ -10,7 +10,7 @@ let camera, scene, renderer, stats;
 let startTime = performance.now()/1000;
 let uniforms, time;
 
-let gridSize = 10; Math.floor(4 + (1- Math.random()**2)*36);
+let gridSize = 20; Math.floor(4 + (1- Math.random()**2)*36);
 
 
 function init() {
@@ -81,8 +81,6 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-//
-
 function animate() {
     requestAnimationFrame(animate);
 
@@ -118,23 +116,23 @@ float rand(vec2 co){
   }
 
 void main()	{
+    float scale = 1. + sinN(time);
+    vUv = uv*scale - (scale - 1.)/2.;
 
-  vUv = uv;
+    float indN = (xInd*gridSize + yInd)/(gridSize*gridSize);
+    float randN = rand(vec2(xInd, yInd));
 
-  float indN = (xInd*gridSize + yInd)/(gridSize*gridSize);
-  float randN = rand(vec2(xInd, yInd));
+    vec3 dev = vec3(ind2pos(xInd), ind2pos(yInd), 0.);
+    vec3 dev_debug = vec3(mix(-.1, .1, xInd/gridSize), mix(-.1, .1, yInd/gridSize), 0.);
+    vec3 dev_debug2 =  vec3(sin(time+indN*3.1415), cos(time+indN*3.1415), 0)*0.1;
 
-  vec3 dev = vec3(ind2pos(xInd), ind2pos(yInd), 0.);
-  vec3 dev_debug = vec3(mix(-.1, .1, xInd/gridSize), mix(-.1, .1, yInd/gridSize), 0.);
-  vec3 dev_debug2 =  vec3(sin(time+indN*3.1415), cos(time+indN*3.1415), 0)*0.1;
+    vec3 motion = vec3(sin(time*(1.+randN*1.)), cos(time*(1.+randN*1.)), 0)*3./gridSize*0.;
 
-  vec3 motion = vec3(sin(time*(1.+randN*1.)), cos(time*(1.+randN*1.)), 0)*3./gridSize*0.;
+    vec3 p = position*scale + dev + mix(motion, vec3(0), pow(sinN(time+yInd/gridSize*3.1415), 6.));
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0 );
 
-  vec3 p = position + dev + mix(motion, vec3(0), pow(sinN(time+yInd/gridSize*3.1415), 6.));
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0 );
-  
-  xInd_v = xInd;
-  yInd_v = yInd;
+    xInd_v = xInd;
+    yInd_v = yInd;
 }`;
 
 let fragmentShader = glsl`
@@ -152,13 +150,13 @@ float sinN(float n){
 
 void main()	{
 
-  vec2 uv = mix(vUv, (vUv-.5) * 1., sinN(time)*0.);
-  vec2 cellCoord = vec2(xInd_v/gridSize + uv.x/gridSize, yInd_v/gridSize + uv.y/gridSize);
-  vec4 paintCell = texture(painting, cellCoord);
-  vec4 debugColor = vec4(xInd_v/gridSize, yInd_v/gridSize, 0.5, 1);
-  vec4 debugColor2 = vec4(cellCoord.x, cellCoord.y, 0.5, 1);
+    vec2 uv = mix(vUv, (vUv-.5) * 1., sinN(time)*0.);
+    vec2 cellCoord = vec2(xInd_v/gridSize + uv.x/gridSize, yInd_v/gridSize + uv.y/gridSize);
+    vec4 paintCell = texture(painting, cellCoord);
+    vec4 debugColor = vec4(xInd_v/gridSize, yInd_v/gridSize, 0.5, 1);
+    vec4 debugColor2 = vec4(cellCoord.x, cellCoord.y, 0.5, 1);
 
-  gl_FragColor = paintCell;
+    gl_FragColor = paintCell;
 
 }
 `;
