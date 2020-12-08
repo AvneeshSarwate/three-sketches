@@ -83,7 +83,7 @@ function createPlaneSamplingScene(){
     const planeGeometry = new THREE.PlaneBufferGeometry(2, 2, 2);
     uniforms2 = {
         time: {value : 0},
-        scene: {value: backgroundTexture}
+        scene: {value: backgroundTexture.texture}
     }
     let samplingMaterial = new THREE.ShaderMaterial({
         uniforms: uniforms2,
@@ -168,11 +168,11 @@ float sinN(float n){
 
 void main()	{
 
-  vec2 uv = vUv;
-  vec2 cellCoord = vec2(xInd/gridSize + uv.x/gridSize, yInd/gridSize + uv.y/gridSize);
-  vec4 paintCell = texture(painting, cellCoord);
+    vec2 uv = vUv;
+    vec2 cellCoord = vec2(xInd/gridSize + uv.x/gridSize, yInd/gridSize + uv.y/gridSize);
+    vec4 paintCell = texture(painting, cellCoord);
 
-  gl_FragColor = paintCell;
+    gl_FragColor = paintCell;
 
 }
 `;
@@ -188,8 +188,9 @@ float sinN(float n){
 }
 
 void main()	{
-
-  gl_FragColor = texture(scene, vUv*sinN(time));
+    float tm = time * 0.5;
+    vec3 samp = texture(scene, vUv).rgb * vec3(sinN(tm), sinN(-tm*0.39+1.+vUv.x*4.5), sinN(tm*0.95+3.));
+    gl_FragColor = vec4(samp, 1);
 
 }
 `;
