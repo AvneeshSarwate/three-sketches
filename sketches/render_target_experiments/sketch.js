@@ -1,10 +1,12 @@
 import * as THREE from "../../three.module.js";
 import Stats from "../../stats.module.js";
 
-let camera, scene, renderer, stats;
+let camera, paintingScene, warpScene, renderer, stats;
 
 let startTime = performance.now()/1000;
-let uniforms, time;
+let uniforms, uniforms2, time;
+
+let backgroundTexture = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
@@ -42,14 +44,10 @@ function createTile(i, j, gridSize, referenceMaterial, painting_texture) {
     return tileMesh;
 }
 
-function init() {
-    const container = document.getElementById("container");
+function createPaintingSamplerScene() {
+    paintingScene = new THREE.Scene();
 
-    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
-    scene = new THREE.Scene();
-
-    const painting_texture = new THREE.TextureLoader().load("/yegor_painting.jpg");
+    const painting_texture = new THREE.TextureLoader().load("../../yegor_painting.jpg");
 
     uniforms = {
         time: { value: 1.0 },
@@ -62,7 +60,7 @@ function init() {
     const material = new THREE.ShaderMaterial({
         uniforms: uniforms,
         vertexShader: vertexShader,
-        fragmentShader: fragmentShader
+        fragmentShader: paintingSamplingShader
     });
 
     let meshes = [];
@@ -76,8 +74,34 @@ function init() {
 
     meshes.forEach(mesh => {
         mesh.renderOrder = Math.random();
-        scene.add(mesh);
+        paintingScene.add(mesh);
     });
+}
+
+function createPlaneSamplingScene(){
+    warpScene = new THREE.Scene();
+    const planeGeometry = new THREE.PlaneBufferGeometry(2, 2, 2);
+    uniforms2 = {
+        time: {value : 0},
+        scene: {value: backgroundTexture}
+    }
+    let samplingMaterial = new THREE.ShaderMaterial({
+        uniforms: uniforms2,
+        vertexShader: vertexShader,
+        fragmentShader: textureWarpShader
+    });
+    let planeMesh = new THREE.Mesh(planeGeometry, samplingMaterial);
+    warpScene.add(planeMesh);
+
+}
+
+function init() {
+    const container = document.getElementById("container");
+
+    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    createPaintingSamplerScene();
+    createPlaneSamplingScene();
 
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio(window.devicePixelRatio / 2);
@@ -93,6 +117,7 @@ function init() {
 
 function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
+    backgroundTexture.setSize(window.innerWidth, window.innerHeight);
 }
 
 //
@@ -102,7 +127,15 @@ function animate() {
 
     time = performance.now() / 1000 - startTime;
 
-    renderer.render(scene, camera);
+    uniforms.time.value = time;
+    uniforms2.time.value = time;
+
+    renderer.setRenderTarget(backgroundTexture);
+    renderer.render(paintingScene, camera);
+
+    renderer.setRenderTarget(null);
+    renderer.render(warpScene, camera);
+
     stats.update();
 }
 
@@ -120,7 +153,7 @@ void main()	{
 
 }`;
 
-let fragmentShader = glsl`
+let paintingSamplingShader = glsl`
 varying vec2 vUv;
 
 uniform float time;
@@ -135,11 +168,28 @@ float sinN(float n){
 
 void main()	{
 
-  vec2 uv = vUv*2.;
+  vec2 uv = vUv;
   vec2 cellCoord = vec2(xInd/gridSize + uv.x/gridSize, yInd/gridSize + uv.y/gridSize);
   vec4 paintCell = texture(painting, cellCoord);
 
   gl_FragColor = paintCell;
+
+}
+`;
+
+let textureWarpShader = glsl`
+varying vec2 vUv;
+
+uniform float time;
+uniform sampler2D scene;
+
+float sinN(float n){
+    return (sin(n)+1.)/2.;
+}
+
+void main()	{
+
+  gl_FragColor = texture(scene, vUv*sinN(time));
 
 }
 `;
