@@ -1,5 +1,6 @@
 import * as THREE from "../../three.module.js";
 import Stats from "../../stats.module.js";
+import header_code from "../../header_frag.js";
 
 let camera, paintingScene, warpScene, renderer, stats;
 
@@ -88,7 +89,7 @@ function createPlaneSamplingScene(){
     }
     let samplingMaterial = new THREE.ShaderMaterial({
         uniforms: uniforms2,
-        vertexShader: vertexShader,
+        vertexShader:header_code + vertexShader,
         fragmentShader: textureWarpShader
     });
     let planeMesh = new THREE.Mesh(planeGeometry, samplingMaterial);
