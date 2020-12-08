@@ -29,7 +29,7 @@ function init() {
 
     const geometryInstanced = new THREE.InstancedBufferGeometry();
 
-    const painting_texture = new THREE.TextureLoader().load("./yegor_painting.jpg");
+    const painting_texture = new THREE.TextureLoader().load("/yegor_painting.jpg");
 
     uniforms = {
         time: { value: 1.0 },

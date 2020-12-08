@@ -6,6 +6,10 @@ let camera, scene, renderer, stats;
 let startTime = performance.now()/1000;
 let uniforms, time;
 
+//template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
+//backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
+const glsl = a => a[0];
+
 let gridSize = 40;
 
 let lerp = (v1, v2, a) => (1 - a) * v1 + a * v2;
@@ -104,7 +108,7 @@ function animate() {
 
 export { init, animate };
 
-let vertexShader = `
+let vertexShader = glsl`
 varying vec2 vUv;
 
 void main()	{
@@ -116,7 +120,7 @@ void main()	{
 
 }`;
 
-let fragmentShader = `
+let fragmentShader = glsl`
 varying vec2 vUv;
 
 uniform float time;
