@@ -4,6 +4,7 @@ let sketchId = urlParams.get("id");
 let sketchFile = './sketch.js'
 if(sketchId == '2') sketchFile = './sketch2.js';
 if(sketchId == '3') sketchFile = './sketch3.js';
+if(sketchId == '4') sketchFile = './sketch4.js';
 
 import(sketchFile).then(Sketch => {
     Sketch.init();
