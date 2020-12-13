@@ -88,7 +88,7 @@ function createPaintingSamplerScene() {
 // let planeMesh;
 function createPlaneSamplingScene(){
     warpScene = new THREE.Scene();
-    const planeGeometry = new THREE.SphereBufferGeometry(0.5, 20, 50);
+    const planeGeometry = new THREE.SphereBufferGeometry(0.3, 20, 50);
     uniforms2 = {
         time: {value : 0},
         scene: {value: backgroundTexture.texture}
@@ -106,8 +106,9 @@ function createPlaneSamplingScene(){
         planeMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group){
             let quat1 = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), time * randTimes[0] );
             let quat2 = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 1, 0, 0 ), time * randTimes[1] );
-            quat2.slerp(quat1, 0.5);
-            planeMesh.rotation.setFromQuaternion(quat2);
+            // quat2.slerp(quat1, 0.5);
+            if(i%2 == 0) planeMesh.rotation.setFromQuaternion(quat1);
+            else planeMesh.rotation.setFromQuaternion(quat2)
         }
         planeMesh.position.x = -1 + (i+0.5)/numSpheres * 2;
         warpScene.add(planeMesh);
@@ -224,7 +225,7 @@ void main()	{
     vec4 paintCell = texture(painting, cellCoord);
     vec4 webcamCell = texture(webcam, cellCoord);
 
-    gl_FragColor = mix(paintCell, webcamCell, pow(sinN(time+cellCoord.x*PI), 2.));
+    gl_FragColor = mix(paintCell, webcamCell, pow(sinN(time+cellCoord.x*PI), 50.));
 }
 `;
 
