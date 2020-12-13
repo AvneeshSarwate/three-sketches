@@ -88,14 +88,14 @@ function createPaintingSamplerScene() {
 // let planeMesh;
 function createPlaneSamplingScene(){
     warpScene = new THREE.Scene();
-    const planeGeometry = new THREE.SphereBufferGeometry(0.3, 20, 50);
+    const planeGeometry = new THREE.SphereBufferGeometry(0.3, 100, 100);
     uniforms2 = {
         time: {value : 0},
         scene: {value: backgroundTexture.texture}
     }
     let samplingMaterial = new THREE.ShaderMaterial({
         uniforms: uniforms2,
-        vertexShader: vertexShader,
+        vertexShader: sphereWarpShader,
         fragmentShader: header_code + textureWarpShader
     });
     let numSpheres = 3;
@@ -206,6 +206,20 @@ void main()	{
 
 }`;
 
+let sphereWarpShader = glsl`
+varying vec2 vUv;
+uniform float time;
+
+void main()	{
+
+  vUv = uv;
+
+  vec3 p = position*3.*3.14;
+  vec3 dev = vec3(sin(time*.81+p.x), sin(time*1.22+p.y), sin(time+p.z))*0.1;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4( position+dev, 1.0 );
+
+}`;
+
 let paintingSamplingShader = glsl`
 varying vec2 vUv;
 
@@ -225,7 +239,7 @@ void main()	{
     vec4 paintCell = texture(painting, cellCoord);
     vec4 webcamCell = texture(webcam, cellCoord);
 
-    gl_FragColor = mix(paintCell, webcamCell, pow(sinN(time+cellCoord.x*PI), 50.));
+    gl_FragColor = mix(paintCell, webcamCell, pow(sinN(time*2.+cellCoord.x*PI), 50.));
 }
 `;
 
