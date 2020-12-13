@@ -37,12 +37,12 @@ function createTile(i, j, gridSize, referenceMaterial, painting_texture) {
     tileMesh.position.z = 0;
 
     let cellPhase = Math.random()*Math.PI*2;
-    let dev = (1 + Math.random()) * 1;
+    let dev = (1 + Math.random()) * 10;
 
     tileMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group){
         tileMesh.position.x = xRoot + Math.cos(time + cellPhase)*(1/gridSize/2) * dev;
         tileMesh.position.y = yRoot + Math.sin(time + cellPhase)*(1/gridSize/2) * dev;
-        tileMesh.scale.x = tileMesh.scale.y =  1; 0.6 + sinN(time * dev)*0.5;
+        tileMesh.scale.x = tileMesh.scale.y =  2; 0.6 + sinN(time * dev)*0.5;
     }
 
     return tileMesh;
@@ -82,7 +82,7 @@ function createPaintingSamplerScene() {
     });
 }
 
-let planeMesh;
+// let planeMesh;
 function createPlaneSamplingScene(){
     warpScene = new THREE.Scene();
     const planeGeometry = new THREE.SphereBufferGeometry(0.5, 20, 50);
@@ -95,9 +95,20 @@ function createPlaneSamplingScene(){
         vertexShader: vertexShader,
         fragmentShader: header_code + textureWarpShader
     });
-    planeMesh = new THREE.Mesh(planeGeometry, samplingMaterial);
-    planeMesh.position.z = -1.;
-    warpScene.add(planeMesh);
+    let numSpheres = 3;
+    for(let i = 0; i < numSpheres; i++) {
+        let planeMesh = new THREE.Mesh(planeGeometry, samplingMaterial);
+        planeMesh.position.z = -1.;
+        let randTimes = [1.5 - Math.random(), 1.5 - Math.random()];
+        planeMesh.onBeforeRender = function(){
+            let quat1 = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), time * randTimes[0] );
+            let quat2 = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 1, 0, 0 ), time * randTimes[1] );
+            quat2.slerp(quat1, 0.5);
+            planeMesh.rotation.setFromQuaternion(quat2);
+        }
+        planeMesh.position.x = -1 + (i+0.5)/numSpheres * 2;
+        warpScene.add(planeMesh);
+    }
 
 }
 
@@ -139,10 +150,6 @@ function animate() {
     renderer.setRenderTarget(backgroundTexture);
     renderer.render(paintingScene, camera);
 
-    let quat1 = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), time );
-    let quat2 = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 1, 0, 0 ), time*0.9 );
-    quat2.slerp(quat1, sinN(time)*0.5);
-    planeMesh.rotation.setFromQuaternion(quat2);
     renderer.setRenderTarget(null);
     renderer.render(warpScene, camera);
 
@@ -197,7 +204,7 @@ void main()	{
     vec2 uv = vec2(quant(vUv.x, 1000.*sinT.x+20.), quant(vUv.y, 1000.*sinT.y+20.));
     vec3 colorTint = vec3(1); vec3(sinN(tm), sinN(-tm*0.39+1.+vUv.x*4.5), sinN(tm*0.95+3.));
     vec3 samp = texture(scene, vUv).rgb * colorTint;
-    gl_FragColor = vec4(samp, 1);
+    gl_FragColor = vec4(samp, 0);
 
 }
 `;
