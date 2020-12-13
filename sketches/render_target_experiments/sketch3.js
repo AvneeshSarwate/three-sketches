@@ -28,6 +28,7 @@ function createTile(i, j, gridSize, referenceMaterial, painting_texture) {
     newMaterial.uniforms.yInd = { value: j };
     newMaterial.uniforms.gridSize = { value: gridSize };
     newMaterial.uniforms.painting = { value: painting_texture };
+    newMaterial.uniforms.webcam = { value: webcamTexture };
     newMaterial.uniforms.tileSize = { value: tileSize/2}
 
     let tileMesh = new THREE.Mesh(geometry, newMaterial);
@@ -37,12 +38,13 @@ function createTile(i, j, gridSize, referenceMaterial, painting_texture) {
     tileMesh.position.z = 0;
 
     let cellPhase = Math.random()*Math.PI*2;
-    let dev = (1 + Math.random()) * 10;
+    let dev = (1 + Math.random()) * 0;
 
     tileMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group){
+        material.uniforms.time.value = time;
         tileMesh.position.x = xRoot + Math.cos(time + cellPhase)*(1/gridSize/2) * dev;
         tileMesh.position.y = yRoot + Math.sin(time + cellPhase)*(1/gridSize/2) * dev;
-        tileMesh.scale.x = tileMesh.scale.y =  2; 0.6 + sinN(time * dev)*0.5;
+        tileMesh.scale.x = tileMesh.scale.y =  1; 0.6 + sinN(time * dev)*0.5;
     }
 
     return tileMesh;
@@ -58,13 +60,14 @@ function createPaintingSamplerScene() {
         xInd: { value: 0 },
         yInd: { value: 0 },
         gridSize: { value: 1 },
-        painting: { value: painting_texture }
+        painting: { value: painting_texture },
+        webcam: { value: webcamTexture }
     };
 
     const material = new THREE.ShaderMaterial({
         uniforms: uniforms,
         vertexShader: vertexShader,
-        fragmentShader: paintingSamplingShader
+        fragmentShader: header_code + paintingSamplingShader
     });
 
     let meshes = [];
@@ -100,7 +103,7 @@ function createPlaneSamplingScene(){
         let planeMesh = new THREE.Mesh(planeGeometry, samplingMaterial);
         planeMesh.position.z = -1.;
         let randTimes = [1.5 - Math.random(), 1.5 - Math.random()];
-        planeMesh.onBeforeRender = function(){
+        planeMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group){
             let quat1 = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), time * randTimes[0] );
             let quat2 = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 1, 0, 0 ), time * randTimes[1] );
             quat2.slerp(quat1, 0.5);
@@ -112,10 +115,42 @@ function createPlaneSamplingScene(){
 
 }
 
+function initWebcam() {
+    if ( navigator.mediaDevices && navigator.mediaDevices.getUserMedia ) {
+
+        const constraints = { video: { width: 1280, height: 720, facingMode: 'user' } };
+
+        navigator.mediaDevices.getUserMedia( constraints ).then( function ( stream ) {
+
+            // apply the stream to the video element used in the texture
+
+            video.srcObject = stream;
+            video.play();
+
+        } ).catch( function ( error ) {
+
+            console.error( 'Unable to access the camera/webcam.', error );
+
+        } );
+
+    } else {
+
+        console.error( 'MediaDevices interface not available.' );
+
+    }
+}
+
+let video;
+let webcamTexture;
 function init() {
     const container = document.getElementById("container");
 
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    video = document.getElementById( 'video' );
+    webcamTexture = new THREE.VideoTexture( video );
+    
+    initWebcam();
 
     createPaintingSamplerScene();
     createPlaneSamplingScene();
@@ -175,6 +210,7 @@ varying vec2 vUv;
 
 uniform float time;
 uniform sampler2D painting;
+uniform sampler2D webcam;
 uniform float xInd;
 uniform float yInd;
 uniform float gridSize;
@@ -186,9 +222,9 @@ void main()	{
     float gridShift = -1./gridSize/2.;
     vec2 cellCoord = vec2(xInd/gridSize + gridShift + uv.x*tileSize, yInd/gridSize + gridShift + uv.y*tileSize);
     vec4 paintCell = texture(painting, cellCoord);
+    vec4 webcamCell = texture(webcam, cellCoord);
 
-    gl_FragColor = paintCell;
-
+    gl_FragColor = mix(paintCell, webcamCell, pow(sinN(time+cellCoord.x*PI), 2.));
 }
 `;
 
@@ -204,7 +240,7 @@ void main()	{
     vec2 uv = vec2(quant(vUv.x, 1000.*sinT.x+20.), quant(vUv.y, 1000.*sinT.y+20.));
     vec3 colorTint = vec3(1); vec3(sinN(tm), sinN(-tm*0.39+1.+vUv.x*4.5), sinN(tm*0.95+3.));
     vec3 samp = texture(scene, vUv).rgb * colorTint;
-    gl_FragColor = vec4(samp, 0);
+    gl_FragColor = vec4(samp, 1);
 
 }
 `;
