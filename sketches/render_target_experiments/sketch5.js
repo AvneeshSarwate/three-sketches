@@ -150,7 +150,13 @@ function init() {
     const container = document.getElementById("container");
 
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    sphereCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);// new THREE.PerspectiveCamera( 45, 2, -1, 1000 )
+    sphereCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    let usePerspectiveCam = true;
+    if(usePerspectiveCam){
+        sphereCam = new THREE.PerspectiveCamera( 90, 1, 0.1, 1000 );
+        sphereCam.position.z = 0.5;
+
+    }
     let helper = new THREE.CameraHelper(sphereCam);
     
     window.camera = camera;
