@@ -145,14 +145,16 @@ function initWebcam() {
 
 let video;
 let webcamTexture;
+let sphereCam;
 function init() {
     const container = document.getElementById("container");
 
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    // camera = new THREE.PerspectiveCamera( 45, 2, -1, 1000 )
-    let helper = new THREE.CameraHelper(camera);
+    sphereCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);// new THREE.PerspectiveCamera( 45, 2, -1, 1000 )
+    let helper = new THREE.CameraHelper(sphereCam);
     
     window.camera = camera;
+    window.sphereCam = sphereCam;
 
     video = document.getElementById( 'video' );
     webcamTexture = new THREE.VideoTexture( video );
@@ -167,7 +169,7 @@ function init() {
     renderer.setPixelRatio(window.devicePixelRatio / 2);
     container.appendChild(renderer.domElement);
 
-    const controls = new OrbitControls( camera, renderer.domElement );
+    const controls = new OrbitControls( sphereCam, renderer.domElement );
 
     onWindowResize();
 
@@ -196,7 +198,7 @@ function animate() {
     renderer.render(paintingScene, camera);
 
     renderer.setRenderTarget(null);
-    renderer.render(warpScene, camera);
+    renderer.render(warpScene, sphereCam);
 
     stats.update();
 }
