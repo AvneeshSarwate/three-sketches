@@ -151,10 +151,11 @@ function init() {
     const container = document.getElementById("container");
 
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    sphereCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    sphereCam = new THREE.OrthographicCamera(-2, 2, 2, -2, 0, 100);
     let usePerspectiveCam = true;
     if(usePerspectiveCam){
         sphereCam = new THREE.PerspectiveCamera( 90, 1, 0.1, 1000 );
+        // sphereCam.position.z = 0.5;
         sphereCam.position.set(1, 0.04, -1.09);
 
     }
@@ -170,10 +171,10 @@ function init() {
 
     createPaintingSamplerScene();
     createPlaneSamplingScene();
-    warpScene.add(helper);
+    // warpScene.add(helper);
 
     renderer = new THREE.WebGLRenderer();
-    renderer.setPixelRatio(window.devicePixelRatio / 2);
+    renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls( sphereCam, renderer.domElement );
@@ -197,6 +198,10 @@ function animate() {
     requestAnimationFrame(animate);
 
     time = performance.now() / 1000 - startTime;
+
+    let s = Math.sin;
+    sphereCam.position.set(s(time*0.3+100), s(time*0.33+5), s(time*0.36 + 20));
+    sphereCam.lookAt(0, 0, -1); //center of middle sphere
 
     uniforms.time.value = time;
     uniforms2.time.value = time;
