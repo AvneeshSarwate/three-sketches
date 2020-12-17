@@ -100,6 +100,7 @@ function createPlaneSamplingScene(){
         vertexShader: sphereWarpShader,
         fragmentShader: header_code + textureWarpShader
     });
+    samplingMaterial.side = THREE.DoubleSide;
     let numSpheres = 3;
     for(let i = 0; i < numSpheres; i++) {
         let planeMesh = new THREE.Mesh(planeGeometry, samplingMaterial);
@@ -154,7 +155,7 @@ function init() {
     let usePerspectiveCam = true;
     if(usePerspectiveCam){
         sphereCam = new THREE.PerspectiveCamera( 90, 1, 0.1, 1000 );
-        sphereCam.position.z = 0.5;
+        sphereCam.position.set(1, 0.04, -1.09);
 
     }
     let helper = new THREE.CameraHelper(sphereCam);
