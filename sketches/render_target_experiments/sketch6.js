@@ -95,13 +95,14 @@ function createFeedbackScene(){
 
     feedbackUniforms = {
         backbuffer: { value: feedbackTargets[0]},
-        scene:      { value: feedbackTargets[1]}
+        scene:      { value: feedbackTargets[1]},
+        time :      { value : 0}
     } 
 
     let feedbackMaterial = new THREE.ShaderMaterial({
         uniforms: feedbackUniforms,
         vertexShader: vertexShader,
-        fragmentShader: feedbackShader
+        fragmentShader: header_code + feedbackShader
     });
 
     let feedbackMesh = new THREE.Mesh(plane, feedbackMaterial);
@@ -230,6 +231,7 @@ function animate() {
 
     uniforms.time.value = time;
     uniforms2.time.value = time;
+    feedbackUniforms.time.value = time;
 
     renderer.setRenderTarget(backgroundTarget);
     renderer.render(paintingScene, camera);
@@ -338,9 +340,11 @@ uniform sampler2D scene;
 uniform sampler2D backbuffer;
 
 void main()	{
-    vec4 bb = texture(backbuffer, vUv);
+    float PI = 3.14159;
+    vec2 dev = vec2(cos(time+vUv.y*PI*2.), sin(time+vUv.x*PI*2.))*0.001;
+    vec4 bb = texture(backbuffer, vUv+dev);
     vec4 samp = texture(scene, vUv);
-    gl_FragColor = mix(samp, bb, 0.98);
+    gl_FragColor = mix(samp, bb, bb.g*(1.+pow(sinN(time+vUv.x*PI)*0.8, 4.)));
 }
 `;
 
