@@ -3,10 +3,10 @@ import Stats from "../../stats.module.js";
 import header_code from "../../header_frag.js";
 import { OrbitControls } from "../../examples/jsm/controls/OrbitControls.js"
 
-let camera, paintingScene, warpScene, feedbackScene, renderer, stats;
+let camera, paintingScene, warpScene, feedbackScene, passthruScene, renderer, stats;
 
 let startTime = performance.now()/1000;
-let uniforms, uniforms2, feedbackUniforms, time;
+let paintingUniforms, warpUniforms, feedbackUniforms, passthruUniforms, time;
 
 let backgroundTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 let feedbackTargets = [0,1].map(() => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight));
@@ -65,7 +65,7 @@ function createPaintingSamplerScene() {
 
     const painting_texture = new THREE.TextureLoader().load("../../yegor_painting.jpg");
 
-    uniforms = {
+    paintingUniforms = {
         time: { value: 1.0 },
         xInd: { value: 0 },
         yInd: { value: 0 },
@@ -75,7 +75,7 @@ function createPaintingSamplerScene() {
     };
 
     const material = new THREE.ShaderMaterial({
-        uniforms: uniforms,
+        uniforms: paintingUniforms,
         vertexShader: vertexShader,
         fragmentShader: header_code + paintingSamplingShader
     });
@@ -99,8 +99,8 @@ function createFeedbackScene(){
     let plane = new THREE.PlaneBufferGeometry(2, 2);
 
     feedbackUniforms = {
-        backbuffer: { value: feedbackTargets[0]},
-        scene:      { value: feedbackTargets[1]},
+        backbuffer: { value: feedbackTargets[0].texture},
+        scene:      { value: warpSceneTarget.texture},
         depth:      { value: warpSceneTarget.depthTexture},
         time :      { value : 0}
     } 
@@ -118,16 +118,35 @@ function createFeedbackScene(){
     feedbackScene.add(feedbackMesh);
 }
 
+function createPassthroughScene() {
+    let plane = new THREE.PlaneBufferGeometry(2, 2);
+
+    passthruUniforms = {
+        passthru: { value: feedbackTargets[(fdbkInd+1)%2].texture}
+    }
+
+    let passthruMaterial = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: passthruShader
+    });
+
+    let passthruMesh = new THREE.Mesh(plane, passthruMaterial);
+
+    passthruScene = new THREE.Scene();
+
+    passthruScene.add(passthruMesh);
+}
+
 // let planeMesh;
 function createSphereScene(){
     warpScene = new THREE.Scene();
     const planeGeometry = new THREE.SphereBufferGeometry(0.5, 100, 100);
-    uniforms2 = {
+    warpUniforms = {
         time: {value : 0},
         scene: {value: backgroundTarget.texture}
     }
     let samplingMaterial = new THREE.ShaderMaterial({
-        uniforms: uniforms2,
+        uniforms: warpUniforms,
         vertexShader: sphereWarpShader,
         fragmentShader: header_code + textureWarpShader
     });
@@ -203,6 +222,7 @@ function init() {
     createPaintingSamplerScene();
     createSphereScene();
     createFeedbackScene();
+    createPassthroughScene();
     // warpScene.add(helper);
 
     renderer = new THREE.WebGLRenderer();
@@ -235,8 +255,8 @@ function animate() {
     sphereCam.position.set(s(time*0.3+100), s(time*0.33+5), s(time*0.36 + 20));
     sphereCam.lookAt(0, 0, -1); //center of middle sphere
 
-    uniforms.time.value = time;
-    uniforms2.time.value = time;
+    paintingUniforms.time.value = time;
+    warpUniforms.time.value = time;
     feedbackUniforms.time.value = time;
 
     renderer.setRenderTarget(backgroundTarget);
@@ -245,14 +265,19 @@ function animate() {
     renderer.setRenderTarget(warpSceneTarget);
     renderer.render(warpScene, sphereCam);
 
-    feedbackUniforms.scene.value = warpSceneTarget.texture;
     feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
     renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
     renderer.render(feedbackScene, camera);
 
-    //todo - should do this with a passthru shader
     renderer.setRenderTarget(null);
-    renderer.render(feedbackScene, camera);
+
+    let usePassthru = false;
+    if(usePassthru){
+        passthruUniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
+        renderer.render(passthruScene, camera);
+    } else {
+        renderer.render(feedbackScene, camera);
+    }
 
     stats.update();
     fdbkInd++;
@@ -352,7 +377,7 @@ void main()	{
     vec4 bb = texture(backbuffer, vUv+dev);
     vec4 samp = texture(scene, vUv);
     vec4 dep = texture(depth, vUv);
-    gl_FragColor = mix(samp, bb, dep.r < 1. ? 0. : 1.);
+    gl_FragColor = mix(samp, bb, dep.r < 1. ? .5 + pow(sinN(time), 1.)*0.5 : 1.);
 }
 `;
 
