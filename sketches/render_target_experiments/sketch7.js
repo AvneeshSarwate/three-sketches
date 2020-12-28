@@ -101,6 +101,7 @@ function createFeedbackScene(){
     feedbackUniforms = {
         backbuffer: { value: feedbackTargets[0]},
         scene:      { value: feedbackTargets[1]},
+        depth:      { value: warpSceneTarget.depthTexture},
         time :      { value : 0}
     } 
 
@@ -244,7 +245,7 @@ function animate() {
     renderer.setRenderTarget(warpSceneTarget);
     renderer.render(warpScene, sphereCam);
 
-    feedbackUniforms.scene.value = warpSceneTarget.depthTexture;
+    feedbackUniforms.scene.value = warpSceneTarget.texture;
     feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
     renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
     renderer.render(feedbackScene, camera);
@@ -343,13 +344,15 @@ varying vec2 vUv;
 uniform float time;
 uniform sampler2D scene;
 uniform sampler2D backbuffer;
+uniform sampler2D depth;
 
 void main()	{
     float PI = 3.14159;
     vec2 dev = vec2(cos(time+vUv.y*PI*2.), sin(time+vUv.x*PI*2.))*0.001;
     vec4 bb = texture(backbuffer, vUv+dev);
     vec4 samp = texture(scene, vUv);
-    gl_FragColor = vec4(samp.rrr, 1.);mix(samp, bb, bb.g*(1.+pow(sinN(time+vUv.x*PI)*0.8, 4.)));
+    vec4 dep = texture(depth, vUv);
+    gl_FragColor = mix(samp, bb, dep.r < 1. ? 0. : 1.);
 }
 `;
 

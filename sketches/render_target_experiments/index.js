@@ -7,6 +7,7 @@ if(sketchId == '3') sketchFile = './sketch3.js';
 if(sketchId == '4') sketchFile = './sketch4.js';
 if(sketchId == '5') sketchFile = './sketch5.js';
 if(sketchId == '6') sketchFile = './sketch6.js';
+if(sketchId == '7') sketchFile = './sketch7.js';
 
 import(sketchFile).then(Sketch => {
     Sketch.init();
