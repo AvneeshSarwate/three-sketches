@@ -126,6 +126,7 @@ function createPassthroughScene() {
     }
 
     let passthruMaterial = new THREE.ShaderMaterial({
+        uniforms: passthruUniforms,
         vertexShader: vertexShader,
         fragmentShader: passthruShader
     });
@@ -271,7 +272,7 @@ function animate() {
 
     renderer.setRenderTarget(null);
 
-    let usePassthru = false;
+    let usePassthru = true;
     if(usePassthru){
         passthruUniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
         renderer.render(passthruScene, camera);
