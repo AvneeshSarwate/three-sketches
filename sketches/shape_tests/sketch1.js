@@ -1,6 +1,9 @@
 import * as THREE from "../../three.module.js";
 import Stats from "../../stats.module.js";
 import header_code from "../../header_frag.js";
+//template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
+//backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
+const glsl = a => a[0];
 
 function range(size, startAt = 0) {
     return [...Array(size).keys()].map(i => i + startAt);
@@ -8,7 +11,7 @@ function range(size, startAt = 0) {
 
 const orig = new THREE.Vector2(0, 0);
 
-let scene, camera, renderer, stats;
+let scene, polygonGeometry, camera, renderer, stats;
 
 
 const numSides = 10;
@@ -27,10 +30,12 @@ function init() {
         return pt;
     });
 
-    const geometry = new THREE.ShapeBufferGeometry(new THREE.Shape(points, 1));
-    const material = new THREE.MeshBasicMaterial( { color: 0xffffff } );
-
-    const mesh = new THREE.Mesh( geometry, material );
+    polygonGeometry = new THREE.ShapeBufferGeometry(new THREE.Shape(points, 1));
+    const material = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: header_code + uvColorShader
+    });
+    const mesh = new THREE.Mesh( polygonGeometry, material );
     scene.add( mesh );
 
     //setting up rendering ==============================    
@@ -55,9 +60,33 @@ function onWindowResize() {
 function animate() {
     requestAnimationFrame(animate);
 
+    polygonGeometry.attributes.position.array[0] = Math.sin(Date.now()/1000)*4;
+    polygonGeometry.attributes.position.needsUpdate = true;
+    polygonGeometry.elementsNeedUpdate = true;
+    polygonGeometry.uvsNeedUpdate = true;
+
     renderer.setRenderTarget(null);
     renderer.render(scene, camera);
     stats.update();
 }
 
 export { init, animate };
+
+let vertexShader = glsl`
+varying vec2 vUv;
+
+void main()	{
+
+  vUv = uv;
+
+  vec3 p = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+}`;
+
+let uvColorShader = glsl`
+varying vec2 vUv;
+
+void main()	{
+  gl_FragColor = vec4(vUv, 1., 1.);
+}`;
