@@ -27,11 +27,11 @@ function init() {
         return pt;
     });
 
-    const geometry = new THREE.BufferGeometry().setFromPoints( points );
-    const material = new THREE.LineBasicMaterial( { color: 0xffffff } );
+    const geometry = new THREE.ShapeBufferGeometry(new THREE.Shape(points, 1));
+    const material = new THREE.MeshBasicMaterial( { color: 0xffffff } );
 
-    const line = new THREE.Line( geometry, material );
-    scene.add( line );
+    const mesh = new THREE.Mesh( geometry, material );
+    scene.add( mesh );
 
     //setting up rendering ==============================    
 
