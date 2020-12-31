@@ -11,7 +11,7 @@ function range(size, startAt = 0) {
 
 const orig = new THREE.Vector2(0, 0);
 
-let scene, polygonGeometry, camera, renderer, stats;
+let scene, polygonGeometry, planeGeometry, camera, renderer, stats;
 
 
 const numSides = 4;
@@ -38,9 +38,9 @@ function init() {
     const mesh = new THREE.Mesh( polygonGeometry, material );
     scene.add( mesh );
 
-    let circle = new THREE.PlaneBufferGeometry(0.2, .2);
-    let circleMesh = new THREE.Mesh(circle, material);
-    scene.add(circleMesh);
+    planeGeometry = new THREE.PlaneGeometry(0.2, .2);
+    let planeMesh = new THREE.Mesh(planeGeometry, material);
+    scene.add(planeMesh);
 
     //setting up rendering ==============================    
 
@@ -68,6 +68,9 @@ function animate() {
     polygonGeometry.verticesNeedUpdate = true;
     // polygonGeometry.elementsNeedUpdate = true;
     // polygonGeometry.uvsNeedUpdate = true;
+
+    planeGeometry.vertices[0].x = Math.sin(Date.now()/1000) * 0.2;
+    planeGeometry.verticesNeedUpdate = true;
 
     renderer.setRenderTarget(null);
     renderer.render(scene, camera);
