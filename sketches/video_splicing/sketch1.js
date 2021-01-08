@@ -24,8 +24,11 @@ let feedbackUniforms, passthruUniforms;
 let videoPlacementScene;
 
 let feedbackTargets = [0,1].map(() => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight));
-let videoPlacementTarget =  new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 let fdbkInd = 0;
+let videoPlacementTarget =  new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+videoPlacementTarget.depthTexture = new THREE.DepthTexture();
+videoPlacementTarget.depthTexture.format = THREE.DepthFormat;
+videoPlacementTarget.depthTexture.type = THREE.UnsignedIntType;
 
 let time;
 let startTime = performance.now()/1000;
@@ -47,9 +50,10 @@ function createVideoPlacementScene() {
 
     let videoPlacementMesh = new THREE.Mesh(plane, videoPlacementMaterial);
 
-    // videoPlacementMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group) {
-    //     this.position.x = Math.sin(time) * 0.1;
-    // }
+    videoPlacementMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group) {
+        this.position.x = Math.sin(time*.95) * 0.5;
+        this.position.y = Math.sin(time*.95*2) * 0.5;
+    }
 
     videoPlacementScene = new THREE.Scene();
 
@@ -183,9 +187,23 @@ uniform sampler2D depth;
 
 void main()	{
     float PI = 3.14159;
+
     vec4 bb = texture(backbuffer, vUv);
     vec4 samp = texture(scene, vUv);
     vec4 dep = texture(depth, vUv);
-    gl_FragColor = mix(samp, bb, sinN(time));
+
+    float decay = 0.005;
+    bool draw = dep.r < 1.;
+    float last_fdbk = bb.a;
+    float fdbk = draw ? 1. : last_fdbk - decay;
+    fdbk = max(0., fdbk);
+
+
+    vec3 col = mix(bb.rgb, samp.rgb, fdbk == 1. ? 1. : 0.);
+    col = mix(black, col, fdbk < 0.05 ? 0. : 1.);
+    // col = mix(bb.rgb, samp.rgb, 0.04);
+    // if(draw) col = samp.rgb;
+
+    gl_FragColor = vec4(col, fdbk);
 }
 `;
