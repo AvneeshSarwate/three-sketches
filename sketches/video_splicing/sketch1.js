@@ -21,7 +21,7 @@ fetch("/media_assets/test_vid.mp4").then(async (res) => {
 
 let pCam, oCam, feedbackScene, passthruScene, renderer, stats;
 let feedbackUniforms, passthruUniforms;
-let videoPlacementScene;
+let videoPlacementScene, videoPlacementUniforms;
 
 let feedbackTargets = [0,1].map(() => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight));
 let fdbkInd = 0;
@@ -34,19 +34,21 @@ let time;
 let startTime = performance.now()/1000;
 
 function createVideoPlacementScene() {
-    let plane = new THREE.PlaneBufferGeometry(.5, .5);
+    let plane = new THREE.PlaneBufferGeometry(.5, .5, 20, 20);
 
     window.vidPlane = plane;
 
-    let videoPlacementUniforms = {
-        passthru: {value: videoTexture}
+    videoPlacementUniforms = {
+        passthru: {value: videoTexture},
+        time :    {value: 0}
     }
 
     let videoPlacementMaterial = new THREE.ShaderMaterial({
         uniforms: videoPlacementUniforms,
-        vertexShader: vertexShader,
+        vertexShader: header_code + vidVertWarp,
         fragmentShader: passthruShader
     });
+    videoPlacementMaterial.side = THREE.DoubleSide;
 
     let videoPlacementMesh = new THREE.Mesh(plane, videoPlacementMaterial);
 
@@ -137,6 +139,7 @@ function animate() {
 
     time = performance.now() / 1000 - startTime;
 
+    videoPlacementUniforms.time.value = time;
     renderer.setRenderTarget(videoPlacementTarget);
     renderer.render(videoPlacementScene, oCam);
 
@@ -166,6 +169,24 @@ void main()	{
 
   vec3 p = position;
   gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+}`;
+
+let vidVertWarp = glsl`
+varying vec2 vUv;
+
+uniform float time;
+
+void main()	{
+
+  vUv = uv;
+
+  vec3 p = position;
+  float posR = rand(p.x*1000. + p.y*905.);
+  float t = time + 10000.;
+  float ydev = sin(t * (1.+.3*posR))*(1.+hash(p).x)*0.3;
+  p.y = p.y + mix(0., ydev, sinN(time+p.x*PI));
+  gl_Position = projectionMatrix * modelViewMatrix * vec4( p, 1.0 );
 
 }`;
 
