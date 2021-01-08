@@ -138,13 +138,13 @@ function animate() {
 
     feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
     feedbackUniforms.time.value = time;
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
     renderer.render(feedbackScene, oCam);
 
-    // renderer.setRenderTarget(null);
+    renderer.setRenderTarget(null);
 
-    // passthruUniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
-    // renderer.render(passthruScene, pCam);
+    passthruUniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
+    renderer.render(passthruScene, oCam);
 
     stats.update();
     fdbkInd++;
