@@ -1,28 +1,68 @@
 import * as THREE from "../../three.module.js";
 import Stats from "../../stats.module.js";
 import header_code from "../../header_frag.js";
+import { htmlToElement } from "../../utilities/utilityFunctions.js"
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
 const glsl = a => a[0];
 
+let video = htmlToElement(`<video id="video" style="display:none" loop autoplay playsinline></video>`)
+let videoTexture = new THREE.VideoTexture(video);
+window.vid = video;
+
+fetch("/media_assets/test_vid.mp4").then(async (res) => {
+    let videoBlob = await res.blob();
+    video.src = URL.createObjectURL(videoBlob);
+    document.body.append(video);
+    video.muted = true;
+    video.play()
+})
 
 let pCam, oCam, feedbackScene, passthruScene, renderer, stats;
 let feedbackUniforms, passthruUniforms;
+let videoPlacementScene;
 
 let feedbackTargets = [0,1].map(() => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight));
+let videoPlacementTarget =  new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 let fdbkInd = 0;
 
 let time;
 let startTime = performance.now()/1000;
+
+function createVideoPlacementScene() {
+    let plane = new THREE.PlaneBufferGeometry(.5, .5);
+
+    window.vidPlane = plane;
+
+    let videoPlacementUniforms = {
+        passthru: {value: videoTexture}
+    }
+
+    let videoPlacementMaterial = new THREE.ShaderMaterial({
+        uniforms: videoPlacementUniforms,
+        vertexShader: vertexShader,
+        fragmentShader: passthruShader
+    });
+
+    let videoPlacementMesh = new THREE.Mesh(plane, videoPlacementMaterial);
+
+    // videoPlacementMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group) {
+    //     this.position.x = Math.sin(time) * 0.1;
+    // }
+
+    videoPlacementScene = new THREE.Scene();
+
+    videoPlacementScene.add(videoPlacementMesh);
+}
 
 function createFeedbackScene(){
     let plane = new THREE.PlaneBufferGeometry(2, 2);
 
     feedbackUniforms = {
         backbuffer: { value: feedbackTargets[0].texture},
-        scene:      { value: warpSceneTarget.texture},
-        depth:      { value: warpSceneTarget.depthTexture},
+        scene:      { value: videoPlacementTarget.texture},
+        depth:      { value: videoPlacementTarget.depthTexture},
         time :      { value : 0}
     } 
 
@@ -65,6 +105,9 @@ function init() {
     pCam = new THREE.PerspectiveCamera( 90, 1, 0.1, 1000 );
     oCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
+    window.pCam = pCam;
+
+    createVideoPlacementScene();
     createFeedbackScene();
     createPassthroughScene();
 
@@ -82,7 +125,7 @@ function init() {
 
 function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
-    [feedbackTargets].flat().map(t => t.setSize(window.innerWidth, window.innerHeight));
+    [feedbackTargets, videoPlacementTarget].flat().map(t => t.setSize(window.innerWidth, window.innerHeight));
 }
 
 function animate() {
@@ -90,15 +133,18 @@ function animate() {
 
     time = performance.now() / 1000 - startTime;
 
+    renderer.setRenderTarget(videoPlacementTarget);
+    renderer.render(videoPlacementScene, oCam);
+
     feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
     feedbackUniforms.time.value = time;
-    renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
+    renderer.setRenderTarget(null);
     renderer.render(feedbackScene, oCam);
 
-    renderer.setRenderTarget(null);
+    // renderer.setRenderTarget(null);
 
-    passthruUniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
-    renderer.render(passthruScene, pCam);
+    // passthruUniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
+    // renderer.render(passthruScene, pCam);
 
     stats.update();
     fdbkInd++;
@@ -137,12 +183,9 @@ uniform sampler2D depth;
 
 void main()	{
     float PI = 3.14159;
-    vec2 dev = vec2(cos(time+vUv.y*PI*2.), sin(time+vUv.x*PI*2.))*0.001;
-    float rowDev = (hash(vec3(quant(vUv.y, 10.), 10., 10.)).x - 0.5) * 0.015;
-    vec2 rowSplitUV = vec2(mod(vUv.x+ rowDev, 1.), vUv.y);
-    vec4 bb = texture(backbuffer, rowSplitUV);
+    vec4 bb = texture(backbuffer, vUv);
     vec4 samp = texture(scene, vUv);
     vec4 dep = texture(depth, vUv);
-    gl_FragColor = mix(samp, bb, dep.r < 1. ? .5 + pow(sinN(time), 1.)*0.5 : 1.);
+    gl_FragColor = mix(samp, bb, sinN(time));
 }
 `;
