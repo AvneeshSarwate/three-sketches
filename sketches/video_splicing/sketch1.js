@@ -2,12 +2,17 @@ import * as THREE from "../../three.module.js";
 import Stats from "../../stats.module.js";
 import header_code from "../../header_frag.js";
 import { htmlToElement } from "../../utilities/utilityFunctions.js"
+import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
+
+const gui = new dat.GUI();
+
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
 const glsl = a => a[0];
 
 const quant = (v, q) => Math.floor(v/q) * q;
+const sinN = n => (Math.sin(n)+1)/2;
 
 let video = htmlToElement(`<video id="video" style="display:none" loop autoplay playsinline></video>`)
 let videoTexture = new THREE.VideoTexture(video);
@@ -25,7 +30,7 @@ const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.in
 
 let pCam, oCam, feedbackScene, passthruScene, renderer, stats;
 let feedbackUniforms, passthruUniforms;
-let videoPlacementScene, videoPlacementUniforms;
+let videoPlacementScene, videoPlacementUniforms, videoPlacementMesh;
 
 let feedackDisplacementScene, feedbackDisplacementUniforms;
 let feedbackDisplacementTarget = newTarget();
@@ -42,7 +47,7 @@ let time;
 let startTime = performance.now()/1000;
 
 function createVideoPlacementScene() {
-    let plane = new THREE.CircleBufferGeometry(0.25, 30);
+    let plane = new THREE.SphereBufferGeometry(0.25, 30, 30);
 
     window.vidPlane = plane;
 
@@ -58,11 +63,14 @@ function createVideoPlacementScene() {
     });
     videoPlacementMaterial.side = THREE.DoubleSide;
 
-    let videoPlacementMesh = new THREE.Mesh(plane, videoPlacementMaterial);
+    videoPlacementMesh = new THREE.Mesh(plane, videoPlacementMaterial);
+
+    window.vidMesh = videoPlacementMesh;
 
     videoPlacementMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group) {
-        this.position.x = (time*1%1)*2 - 1; Math.sin(quant(time,0.2) *.95) * 0.5;
-        this.position.y = Math.sin(quant(time,0.2) *.95*2) * 0.5;
+        this.position.x = (time*0.3%1)*2 - 1; Math.sin(quant(time,0.2) *.95) * 0.5;
+        this.position.y = Math.sin(time *.95*2) * 0.5;
+        // this.position.z = -1*(time%1);
     }
 
     videoPlacementScene = new THREE.Scene();
@@ -138,6 +146,7 @@ function init() {
     const container = document.getElementById("container");
 
     pCam = new THREE.PerspectiveCamera( 90, 1, 0.1, 1000 );
+    pCam.position.z = 1;
     oCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
     window.pCam = pCam;
@@ -164,6 +173,16 @@ function onWindowResize() {
     [feedbackTargets, feedbackDisplacementTarget, videoPlacementTarget].flat().map(t => t.setSize(window.innerWidth, window.innerHeight));
 }
 
+function animateVideoPlacement() {
+    const meshPos = videoPlacementMesh.position;
+    const s = Math.sin;
+    const camAnim = new THREE.Vector3(s(time*.45), s(time*.33), s(time*.23));
+    const newPos = camAnim.lerp(meshPos, sinN(time*.28));
+
+    pCam.position.set(newPos.x, newPos.y, newPos.z);
+    pCam.lookAt(new THREE.Vector3(0, 0, 0));
+}
+
 function animate() {
     requestAnimationFrame(animate);
 
@@ -173,9 +192,10 @@ function animate() {
     renderer.setRenderTarget(feedbackDisplacementTarget);
     renderer.render(feedackDisplacementScene, oCam);
 
+    animateVideoPlacement();
     videoPlacementUniforms.time.value = time;
     renderer.setRenderTarget(videoPlacementTarget);
-    renderer.render(videoPlacementScene, oCam);
+    renderer.render(videoPlacementScene, pCam);
 
     feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
     feedbackUniforms.time.value = time;
@@ -255,7 +275,7 @@ vec4 xySignSplit(vec2 xy){
 }
 
 void main()	{
-    vec2 dir = sin(time) < 0. ? vec2(sign(vUv.y-0.5), 0.) : vec2(0., sign(vUv.x-0.5));
+    vec2 dir = mix(vec2(sign(vUv.y-0.5), 0.), vec2(0., sign(vUv.x-0.5)), sinN(time*0.3));
     gl_FragColor = xySignSplit(dir*0.003);
 }`;
 
@@ -298,7 +318,7 @@ void main()	{
 
 
     vec3 col = mix(bb.rgb, samp.rgb, fdbk == 1. ? 1. : 0.);
-    col = mix(black, col, fdbk < 0.05 ? 0. : 1.);
+    // col = mix(black, col, fdbk < 0.05 ? 0. : 1.);
     // col = mix(bb.rgb, samp.rgb, 0.04);
     // if(draw) col = samp.rgb;
 
