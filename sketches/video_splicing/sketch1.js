@@ -68,7 +68,7 @@ function createVideoPlacementScene() {
     window.vidMesh = videoPlacementMesh;
 
     videoPlacementMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group) {
-        this.position.x = (time*0.3%1)*2 - 1; Math.sin(quant(time,0.2) *.95) * 0.5;
+        this.position.x = Math.sin(time *.95) * 0.5;
         this.position.y = Math.sin(time *.95*2) * 0.5;
         // this.position.z = -1*(time%1);
     }
@@ -175,9 +175,10 @@ function onWindowResize() {
 
 function animateVideoPlacement() {
     const meshPos = videoPlacementMesh.position;
-    const s = Math.sin;
-    const camAnim = new THREE.Vector3(s(time*.45), s(time*.33), s(time*.23));
-    const newPos = camAnim.lerp(meshPos, sinN(time*.28));
+    const s = Math.sin, pi = Math.PI;
+    const camAnim = new THREE.Vector3();
+    camAnim.setFromSphericalCoords(2, s(time*0.32)*pi, s(time*0.52)*pi)
+    const newPos = camAnim.lerp(meshPos, sinN(time*.28)*0.5);
 
     pCam.position.set(newPos.x, newPos.y, newPos.z);
     pCam.lookAt(new THREE.Vector3(0, 0, 0));
@@ -255,7 +256,8 @@ void main()	{
     uv.y = mod(time * dir + vUv.y, 1.);
     uv.x = mod(time * dir + vUv.x, 1.);
     uv = mix(uv, vec2(0.5), 0.3+sinN(time*0.3)*0.5);
-    gl_FragColor = texture(passthru, uv);
+    float quantDev = pow(sinN(time*0.32), 3.)*300.;
+    gl_FragColor = texture(passthru, quant(vUv, 20. + quantDev));
 }`;
 
 let passthruShader = glsl`
@@ -297,7 +299,7 @@ vec2 xySignCompose(vec4 xy){
 void main()	{
     float PI = 3.14159;
 
-    vec2 bbN = mix(vUv, coordWarp(vUv, time).xy, 0.01);
+    vec2 bbN = mix(vUv, coordWarp(vUv, time).xy, 0.005);
 
     
     vec4 bb2 = texture(backbuffer, bbN);
@@ -305,12 +307,14 @@ void main()	{
     vec4 dep = texture(depth, vUv);
 
     vec4 disp4 = texture(displacement, vUv);
-    vec2 disp = xySignCompose(disp4);
+    vec2 disp = xySignCompose(disp4)*0.1;
 
-    vec2 hashN = (hash(vec3(vUv, time))-0.5).xy * 0.001;
-    vec4 bb = texture(backbuffer, vUv+hashN + disp);
+    vec2 hashN = (hash(vec3(vUv, time))-0.5).xy * 0.0005;
+    vec4 bb3 = texture(backbuffer, mix(vUv+hashN + disp, vec2(0.5), 0.001));
+    
+    vec4 bb = texture(backbuffer, mix(vUv+hashN + disp, vec2(0.5), 0.001));
 
-    float decay = 0.005;
+    float decay = 0.001;
     bool draw = dep.r < 1.;
     float last_fdbk = bb2.a;
     float fdbk = draw ? 1. : last_fdbk - decay;
@@ -318,7 +322,7 @@ void main()	{
 
 
     vec3 col = mix(bb.rgb, samp.rgb, fdbk == 1. ? 1. : 0.);
-    // col = mix(black, col, fdbk < 0.05 ? 0. : 1.);
+    col = mix(black, col, fdbk < 0.01 ? 0. : 1.);
     // col = mix(bb.rgb, samp.rgb, 0.04);
     // if(draw) col = samp.rgb;
 
