@@ -690,6 +690,19 @@ vec2 quant(vec2 num, float quantLevels){
     vec2 roundPart = floor(fract(num*quantLevels)*2.);
     return (floor(num*quantLevels)+roundPart)/quantLevels;
 }
+
+vec3 coordWarp(vec2 stN, float t2){ 
+    vec2 warp = stN;
+    
+    float rad = .5;
+    
+    for (float i = 0.0; i < 20.; i++) {
+        vec2 p = vec2(sinN(t2* rand(i+1.) * 1.3 + i), cosN(t2 * rand(i+1.) * 1.1 + i));
+        warp = length(p - stN) <= rad ? mix(p, warp, length(stN - p)/rad)  : warp;
+    }
+    
+    return vec3(warp, distance(warp, stN));
+}
 `;
 
 export default header_code;
