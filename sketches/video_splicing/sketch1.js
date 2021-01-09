@@ -21,13 +21,19 @@ fetch("/media_assets/test_vid.mp4").then(async (res) => {
     video.play()
 })
 
+const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+
 let pCam, oCam, feedbackScene, passthruScene, renderer, stats;
 let feedbackUniforms, passthruUniforms;
 let videoPlacementScene, videoPlacementUniforms;
 
-let feedbackTargets = [0,1].map(() => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight));
+let feedackDisplacementScene, feedbackDisplacementUniforms;
+let feedbackDisplacementTarget = newTarget();
+
+let feedbackTargets = [0,1].map(newTarget);
 let fdbkInd = 0;
-let videoPlacementTarget =  new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+
+let videoPlacementTarget = newTarget();
 videoPlacementTarget.depthTexture = new THREE.DepthTexture();
 videoPlacementTarget.depthTexture.format = THREE.DepthFormat;
 videoPlacementTarget.depthTexture.type = THREE.UnsignedIntType;
@@ -64,6 +70,26 @@ function createVideoPlacementScene() {
     videoPlacementScene.add(videoPlacementMesh);
 }
 
+function createFeedbackDisplacementScene() {
+    let plane = new THREE.PlaneBufferGeometry(2, 2);
+
+    feedbackDisplacementUniforms = {
+        time: {value: 0}
+    }
+
+    let material = new THREE.ShaderMaterial({
+        uniforms: feedbackDisplacementUniforms,
+        vertexShader: vertexShader,
+        fragmentShader: header_code + feedbackDisplacementShader
+    });
+
+    let mesh = new THREE.Mesh(plane, material);
+
+    feedackDisplacementScene = new THREE.Scene();
+
+    feedackDisplacementScene.add(mesh);
+}
+
 function createFeedbackScene(){
     let plane = new THREE.PlaneBufferGeometry(2, 2);
 
@@ -71,6 +97,7 @@ function createFeedbackScene(){
         backbuffer: { value: feedbackTargets[0].texture},
         scene:      { value: videoPlacementTarget.texture},
         depth:      { value: videoPlacementTarget.depthTexture},
+        displacement: {value: feedbackDisplacementTarget.texture},
         time :      { value : 0}
     } 
 
@@ -116,6 +143,7 @@ function init() {
     window.pCam = pCam;
 
     createVideoPlacementScene();
+    createFeedbackDisplacementScene();
     createFeedbackScene();
     createPassthroughScene();
 
@@ -133,13 +161,17 @@ function init() {
 
 function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
-    [feedbackTargets, videoPlacementTarget].flat().map(t => t.setSize(window.innerWidth, window.innerHeight));
+    [feedbackTargets, feedbackDisplacementTarget, videoPlacementTarget].flat().map(t => t.setSize(window.innerWidth, window.innerHeight));
 }
 
 function animate() {
     requestAnimationFrame(animate);
 
     time = performance.now() / 1000 - startTime;
+
+    feedbackDisplacementUniforms.time.value = time;
+    renderer.setRenderTarget(feedbackDisplacementTarget);
+    renderer.render(feedackDisplacementScene, oCam);
 
     videoPlacementUniforms.time.value = time;
     renderer.setRenderTarget(videoPlacementTarget);
@@ -214,6 +246,19 @@ void main()	{
     gl_FragColor = texture(passthru, vUv);
 }`;
 
+let feedbackDisplacementShader = glsl`
+varying vec2 vUv;
+uniform float time;
+
+vec4 xySignSplit(vec2 xy){
+    return vec4(max(xy.x, 0.), abs(min(xy.x, 0.)), max(xy.y, 0.), abs(min(xy.y, 0.)));
+}
+
+void main()	{
+    vec2 dir = sin(time) < 0. ? vec2(sign(vUv.y-0.5), 0.) : vec2(0., sign(vUv.x-0.5));
+    gl_FragColor = xySignSplit(dir*0.003);
+}`;
+
 let feedbackShader = glsl`
 varying vec2 vUv;
 
@@ -221,17 +266,29 @@ uniform float time;
 uniform sampler2D scene;
 uniform sampler2D backbuffer;
 uniform sampler2D depth;
+uniform sampler2D displacement;
+
+vec2 xySignCompose(vec4 xy){
+    float x = xy.x + (-1.*xy.y);
+    float y = xy.z + (-1.*xy.w);
+    return vec2(x, y);
+}
 
 void main()	{
     float PI = 3.14159;
 
     vec2 bbN = mix(vUv, coordWarp(vUv, time).xy, 0.01);
 
-    vec2 hashN = (hash(vec3(vUv, time))-0.5).xy * 0.001;
-    vec4 bb = texture(backbuffer, vUv+hashN);
+    
     vec4 bb2 = texture(backbuffer, bbN);
     vec4 samp = texture(scene, vUv);
     vec4 dep = texture(depth, vUv);
+
+    vec4 disp4 = texture(displacement, vUv);
+    vec2 disp = xySignCompose(disp4);
+
+    vec2 hashN = (hash(vec3(vUv, time))-0.5).xy * 0.001;
+    vec4 bb = texture(backbuffer, vUv+hashN + disp);
 
     float decay = 0.005;
     bool draw = dep.r < 1.;
