@@ -5,10 +5,11 @@ import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 
 const gui = new dat.GUI();
-let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5}
+let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false}
 gui.add(eyePos, 'xEye');
 gui.add(eyePos, 'yEye');
 gui.add(eyePos, 'zoom');
+gui.add(eyePos, 'simplifyEye');
 
 
 
@@ -35,7 +36,9 @@ const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.in
 
 let pCam, oCam, feedbackScene, passthruScene, renderer, stats;
 let feedbackUniforms, passthruUniforms;
+
 let videoPlacementScene, videoPlacementUniforms, videoPlacementMesh;
+let eyePlane, eyeSphere, simpleEyeScene;
 
 let feedackDisplacementScene, feedbackDisplacementUniforms;
 let feedbackDisplacementTarget = newTarget();
@@ -52,10 +55,11 @@ let time;
 let startTime = performance.now()/1000;
 
 function createVideoPlacementScene() {
-    let plane = new THREE.SphereBufferGeometry(0.25, 30, 30);
-    // plane = new THREE.PlaneBufferGeometry(2, 2);
+    let plane = new THREE.PlaneBufferGeometry(2, 2);
+    eyePlane = plane;
 
-    window.vidPlane = plane;
+    let sphere = new THREE.SphereBufferGeometry(0.25, 30, 30);
+    eyeSphere = sphere;
 
     videoPlacementUniforms = {
         passthru: {value: videoTexture},
@@ -70,19 +74,27 @@ function createVideoPlacementScene() {
     });
     videoPlacementMaterial.side = THREE.DoubleSide;
 
-    videoPlacementMesh = new THREE.Mesh(plane, videoPlacementMaterial);
+    videoPlacementMesh = new THREE.Mesh(sphere, videoPlacementMaterial);
 
     window.vidMesh = videoPlacementMesh;
 
     videoPlacementMesh.onBeforeRender = function(renderer, scene, camera, geometry, material, group) {
-        this.position.x = Math.sin(time *.95) * 0.5;
-        this.position.y = Math.sin(time *.95*2) * 0.5;
+        if(eyePos.simplifyEye) {
+            this.position.x = this.position.y = 0;
+        } else {
+            this.position.x = Math.sin(time *.95) * 0.5;
+            this.position.y = Math.sin(time *.95*2) * 0.5;
+        }
+        
         // this.position.z = -1*(time%1);
     }
 
     videoPlacementScene = new THREE.Scene();
-
     videoPlacementScene.add(videoPlacementMesh);
+
+    let simpleEyeMesh = new THREE.Mesh(eyePlane, videoPlacementMaterial);
+    simpleEyeScene = new THREE.Scene();
+    simpleEyeScene.add(simpleEyeMesh);
 }
 
 function createFeedbackDisplacementScene() {
@@ -196,25 +208,36 @@ function animate() {
 
     time = performance.now() / 1000 - startTime;
 
-    feedbackDisplacementUniforms.time.value = time;
-    renderer.setRenderTarget(feedbackDisplacementTarget);
-    renderer.render(feedackDisplacementScene, oCam);
+    if(eyePos.simplifyEye){
+        pCam.position.set(0, 0, -1);
+        pCam.lookAt(new THREE.Vector3(0, 0, 0));
+        videoPlacementUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
+        videoPlacementUniforms.time.value = time;
+        renderer.setRenderTarget(null);
+        renderer.render(simpleEyeScene, pCam);
+    }
 
-    animateVideoPlacement();
-    videoPlacementUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
-    videoPlacementUniforms.time.value = time;
-    renderer.setRenderTarget(videoPlacementTarget);
-    renderer.render(videoPlacementScene, pCam);
+    else {
+        feedbackDisplacementUniforms.time.value = time;
+        renderer.setRenderTarget(feedbackDisplacementTarget);
+        renderer.render(feedackDisplacementScene, oCam);
 
-    feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
-    feedbackUniforms.time.value = time;
-    renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
-    renderer.render(feedbackScene, oCam);
+        animateVideoPlacement();
+        videoPlacementUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
+        videoPlacementUniforms.time.value = time;
+        renderer.setRenderTarget(videoPlacementTarget);
+        renderer.render(videoPlacementScene, pCam);
 
-    renderer.setRenderTarget(null);
+        feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
+        feedbackUniforms.time.value = time;
+        renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
+        renderer.render(feedbackScene, oCam);
 
-    passthruUniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
-    renderer.render(passthruScene, oCam);
+        renderer.setRenderTarget(null);
+
+        passthruUniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
+        renderer.render(passthruScene, oCam);
+    }
 
     stats.update();
     fdbkInd++;
