@@ -5,6 +5,11 @@ import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 
 const gui = new dat.GUI();
+let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5}
+gui.add(eyePos, 'xEye');
+gui.add(eyePos, 'yEye');
+gui.add(eyePos, 'zoom');
+
 
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
@@ -18,7 +23,7 @@ let video = htmlToElement(`<video id="video" style="display:none" loop autoplay 
 let videoTexture = new THREE.VideoTexture(video);
 window.vid = video;
 
-fetch("/media_assets/test_vid.mp4").then(async (res) => {
+fetch("/media_assets/eye_movement2.mp4").then(async (res) => {
     let videoBlob = await res.blob();
     video.src = URL.createObjectURL(videoBlob);
     document.body.append(video);
@@ -48,12 +53,14 @@ let startTime = performance.now()/1000;
 
 function createVideoPlacementScene() {
     let plane = new THREE.SphereBufferGeometry(0.25, 30, 30);
+    // plane = new THREE.PlaneBufferGeometry(2, 2);
 
     window.vidPlane = plane;
 
     videoPlacementUniforms = {
         passthru: {value: videoTexture},
-        time :    {value: 0}
+        time :    {value: 0},
+        eyePos: {value: new THREE.Vector3(.5, .5, .5)}
     }
 
     let videoPlacementMaterial = new THREE.ShaderMaterial({
@@ -194,6 +201,7 @@ function animate() {
     renderer.render(feedackDisplacementScene, oCam);
 
     animateVideoPlacement();
+    videoPlacementUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
     videoPlacementUniforms.time.value = time;
     renderer.setRenderTarget(videoPlacementTarget);
     renderer.render(videoPlacementScene, pCam);
@@ -249,15 +257,25 @@ let vidCutShader = glsl`
 varying vec2 vUv;
 uniform sampler2D passthru;
 uniform float time;
+uniform vec3 eyePos;
 
 void main()	{
-    vec2 uv = vUv;
-    float dir = vUv.y < 0.5 ? -1. : 1.;
-    uv.y = mod(time * dir + vUv.y, 1.);
-    uv.x = mod(time * dir + vUv.x, 1.);
-    uv = mix(uv, vec2(0.5), 0.3+sinN(time*0.3)*0.5);
-    float quantDev = pow(sinN(time*0.32), 3.)*300.;
-    gl_FragColor = texture(passthru, quant(vUv, 20. + quantDev));
+    vec2 uv = mix(vUv, eyePos.xy, eyePos.z);
+    // float dir = vUv.y < 0.5 ? -1. : 1.;
+    // uv.y = mod(time * dir + vUv.y, 1.);
+    // uv.x = mod(time * dir + vUv.x, 1.);
+    // uv = mix(uv, vec2(0.5), 0.3+sinN(time*0.3)*0.5);
+    // float quantDev = pow(sinN(time*0.32), 3.)*300.;
+    vec4 samp = texture(passthru, uv);
+    float edgeW = 0.001;
+    vec4 rightEdge = texture(passthru, vec2(1.-edgeW, uv.y));
+    vec4 leftEdge = texture(passthru, vec2(edgeW, uv.y));
+    vec4 seamColor = mix(leftEdge, rightEdge, 0.5);
+    float blendDist = 0.05;
+    vec4 blendVal = mix(seamColor, samp, clamp(vUv.x, 0., blendDist)/blendDist);
+    blendVal = mix(seamColor, blendVal, clamp(1.-vUv.x, 0., blendDist)/blendDist);
+
+    gl_FragColor = blendVal;
 }`;
 
 let passthruShader = glsl`
