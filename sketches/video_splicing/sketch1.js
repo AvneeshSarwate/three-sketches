@@ -5,12 +5,15 @@ import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 
 const gui = new dat.GUI();
-let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false}
-gui.add(eyePos, 'xEye');
-gui.add(eyePos, 'yEye');
-gui.add(eyePos, 'zoom');
+let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 0, useVidTex: false}
+gui.add(eyePos, 'xEye', 0, 1, 0.01);
+gui.add(eyePos, 'yEye', 0, 1, 0.01);
+gui.add(eyePos, 'zoom', 0, 1, 0.01);
 gui.add(eyePos, 'simplifyEye');
-
+gui.add(eyePos, 'vidScrub').onChange(v => v ? video.pause() : video.play());
+gui.add(eyePos, 'vidPos', 0, 1, 0.001).onChange(v => {video.currentTime = video.duration * v});
+gui.add(eyePos, 'vidTexPos', 0, 200);
+gui.add(eyePos, 'useVidTex');
 
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
@@ -32,6 +35,16 @@ fetch("/media_assets/eye_movement2.mp4").then(async (res) => {
     video.play()
 })
 
+fetch("/media_assets/eye_raw.rgb").then(async (res) => {
+    let rgbBlob = await res.blob();
+    let blobArray = await rgbBlob.arrayBuffer();
+    let rgbData = new Uint8Array(blobArray, 0, 256 * 256 * 3 * 200);
+    videoTextureArray.dispose();
+
+    videoTextureArray = createTextureArray(rgbData, 256, 256, 200);
+    videoPlacementUniforms.vidFrames.values = videoTextureArray;
+})
+
 const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 
 let pCam, oCam, feedbackScene, passthruScene, renderer, stats;
@@ -39,6 +52,11 @@ let feedbackUniforms, passthruUniforms;
 
 let videoPlacementScene, videoPlacementUniforms, videoPlacementMesh;
 let eyePlane, eyeSphere, simpleEyeScene;
+let videoPlacementTarget = newTarget();
+videoPlacementTarget.depthTexture = new THREE.DepthTexture();
+videoPlacementTarget.depthTexture.format = THREE.DepthFormat;
+videoPlacementTarget.depthTexture.type = THREE.UnsignedIntType;
+let videoTextureArray;
 
 let feedackDisplacementScene, feedbackDisplacementUniforms;
 let feedbackDisplacementTarget = newTarget();
@@ -46,13 +64,16 @@ let feedbackDisplacementTarget = newTarget();
 let feedbackTargets = [0,1].map(newTarget);
 let fdbkInd = 0;
 
-let videoPlacementTarget = newTarget();
-videoPlacementTarget.depthTexture = new THREE.DepthTexture();
-videoPlacementTarget.depthTexture.format = THREE.DepthFormat;
-videoPlacementTarget.depthTexture.type = THREE.UnsignedIntType;
 
 let time;
 let startTime = performance.now()/1000;
+
+function createTextureArray(data, height, width, depth) {
+    const texture = new THREE.DataTexture2DArray( data, width, height, depth );
+    texture.format = THREE.RGBFormat;
+    texture.type = THREE.UnsignedByteType;
+    return texture;
+}
 
 function createVideoPlacementScene() {
     let plane = new THREE.PlaneBufferGeometry(2, 2);
@@ -61,10 +82,16 @@ function createVideoPlacementScene() {
     let sphere = new THREE.SphereBufferGeometry(0.25, 30, 30);
     eyeSphere = sphere;
 
+    let data = new Uint8Array(256*256*3*200);
+    // data = data.map((e, i) => sinN()
+    videoTextureArray = createTextureArray(data, 256, 256, 200);
+
     videoPlacementUniforms = {
-        passthru: {value: videoTexture},
-        time :    {value: 0},
-        eyePos: {value: new THREE.Vector3(.5, .5, .5)}
+        passthru:  {value: videoTexture},
+        time :     {value: 0},
+        eyePos:    {value: new THREE.Vector3(.5, .5, .5)},
+        vidFrames: {value: videoTextureArray},
+        useVidTex: {value: false}
     }
 
     let videoPlacementMaterial = new THREE.ShaderMaterial({
@@ -213,6 +240,7 @@ function animate() {
         pCam.lookAt(new THREE.Vector3(0, 0, 0));
         videoPlacementUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
         videoPlacementUniforms.time.value = time;
+        videoPlacementUniforms.useVidTex.value = eyePos.useVidTex;
         renderer.setRenderTarget(null);
         renderer.render(simpleEyeScene, pCam);
     }
@@ -225,6 +253,7 @@ function animate() {
         animateVideoPlacement();
         videoPlacementUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
         videoPlacementUniforms.time.value = time;
+        videoPlacementUniforms.useVidTex.value = eyePos.useVidTex;
         renderer.setRenderTarget(videoPlacementTarget);
         renderer.render(videoPlacementScene, pCam);
 
@@ -277,10 +306,15 @@ void main()	{
 }`;
 
 let vidCutShader = glsl`
+precision highp sampler2DArray;
+
 varying vec2 vUv;
 uniform sampler2D passthru;
 uniform float time;
 uniform vec3 eyePos;
+uniform sampler2DArray vidFrames;
+uniform int frameInd;
+uniform bool useVidTex;
 
 void main()	{
     vec2 uv = mix(vUv, eyePos.xy, eyePos.z);
@@ -290,6 +324,8 @@ void main()	{
     // uv = mix(uv, vec2(0.5), 0.3+sinN(time*0.3)*0.5);
     // float quantDev = pow(sinN(time*0.32), 3.)*300.;
     vec4 samp = texture(passthru, uv);
+    vec4 sampTex = texture(vidFrames, vec3(uv, frameInd));
+    if(useVidTex) samp = sampTex;
     float edgeW = 0.001;
     vec4 rightEdge = texture(passthru, vec2(1.-edgeW, uv.y));
     vec4 leftEdge = texture(passthru, vec2(edgeW, uv.y));
