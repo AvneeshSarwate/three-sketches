@@ -5,7 +5,7 @@ import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 
 const gui = new dat.GUI();
-let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 0, useVidTex: false}
+let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: true, vidScrub: false, vidPos: 0, vidTexPos: 0, useVidTex: true}
 gui.add(eyePos, 'xEye', 0, 1, 0.01);
 gui.add(eyePos, 'yEye', 0, 1, 0.01);
 gui.add(eyePos, 'zoom', 0, 1, 0.01);
@@ -27,7 +27,7 @@ let video = htmlToElement(`<video id="video" style="display:none" loop autoplay 
 let videoTexture = new THREE.VideoTexture(video);
 window.vid = video;
 
-fetch("/media_assets/eye_movement2.mp4").then(async (res) => {
+fetch("/media_assets/eye_movement_short_small2.mp4").then(async (res) => {
     let videoBlob = await res.blob();
     video.src = URL.createObjectURL(videoBlob);
     document.body.append(video);
@@ -35,14 +35,20 @@ fetch("/media_assets/eye_movement2.mp4").then(async (res) => {
     video.play()
 })
 
+window.onbeforeunload = function(){
+    videoTextureArray.dispose();
+}
+
 fetch("/media_assets/eye_raw.rgb").then(async (res) => {
+    console.log("eye_raw loaded");
+    // return
+    const  width = 384, height = 216, numFrames = 200;
     let rgbBlob = await res.blob();
     let blobArray = await rgbBlob.arrayBuffer();
-    let rgbData = new Uint8Array(blobArray, 0, 256 * 256 * 3 * 200);
-
-    videoTextureArray = createTextureArray(rgbData, 256, 256, 200);
+    let rgbData = new Uint8Array(blobArray, 0, width * height * 3 * numFrames);
+    videoTextureArray.dispose();
+    videoTextureArray = createTextureArray(rgbData, width, height, numFrames);
     videoPlacementUniforms.vidFrames.value = videoTextureArray;
-    console.log("eye_raw loaded");
 });
 
 const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
@@ -68,7 +74,7 @@ let fdbkInd = 0;
 let time;
 let startTime = performance.now()/1000;
 
-function createTextureArray(data, height, width, depth) {
+function createTextureArray(data, width, height, depth) {
     const texture = new THREE.DataTexture2DArray( data, width, height, depth );
     texture.format = THREE.RGBFormat;
     texture.type = THREE.UnsignedByteType;
@@ -83,7 +89,9 @@ function createVideoPlacementScene() {
     eyeSphere = sphere;
 
     let data = new Uint8Array(256*256*3*10);
-    data = data.map((e, i) => Math.floor(sinN(i/20*100)*256))
+    let exp1 = i => sinN( Math.floor(i/256)*2*Math.PI *0.05 );
+    let exp2 = i => (i / (256**2 * 3) % 1);
+    data = data.map((e, i) => Math.floor(exp2(i)*256))
     videoTextureArray = createTextureArray(data, 256, 256, 10);
 
     videoPlacementUniforms = {
@@ -338,7 +346,7 @@ void main()	{
     vec4 blendVal = mix(seamColor, samp, clamp(vUv.x, 0., blendDist)/blendDist);
     blendVal = mix(seamColor, blendVal, clamp(1.-vUv.x, 0., blendDist)/blendDist);
 
-    gl_FragColor = blendVal;
+    gl_FragColor = samp;
 }`;
 
 let passthruShader = glsl`
