@@ -5,7 +5,7 @@ import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 
 const gui = new dat.GUI();
-let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: true, vidScrub: false, vidPos: 0, vidTexPos: 0, useVidTex: true}
+let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 0, useVidTex: true, eyeRotation: 0};
 gui.add(eyePos, 'xEye', 0, 1, 0.01);
 gui.add(eyePos, 'yEye', 0, 1, 0.01);
 gui.add(eyePos, 'zoom', 0, 1, 0.01);
@@ -14,6 +14,7 @@ gui.add(eyePos, 'vidScrub').onChange(v => v ? video.pause() : video.play());
 gui.add(eyePos, 'vidPos', 0, 1, 0.001).onChange(v => {video.currentTime = video.duration * v});
 gui.add(eyePos, 'vidTexPos', 0, 200);
 gui.add(eyePos, 'useVidTex');
+gui.add(eyePos, 'eyeRotation', 0, 2, .001);
 
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
@@ -78,6 +79,7 @@ function createTextureArray(data, width, height, depth) {
     const texture = new THREE.DataTexture2DArray( data, width, height, depth );
     texture.format = THREE.RGBFormat;
     texture.type = THREE.UnsignedByteType;
+    // texture.flipY = true;
     return texture;
 }
 
@@ -237,6 +239,9 @@ function animateVideoPlacement() {
 
     pCam.position.set(newPos.x, newPos.y, newPos.z);
     pCam.lookAt(new THREE.Vector3(0, 0, 0));
+
+    videoPlacementMesh.lookAt(pCam.position);
+    videoPlacementMesh.rotateY(eyePos.eyeRotation * Math.PI);
 }
 
 function setVideoPlacementUniforms() {
@@ -328,6 +333,10 @@ uniform sampler2DArray vidFrames;
 uniform int frameInd;
 uniform bool useVidTex;
 
+vec2 flipY(vec2 v){
+    return vec2(v.x, 1.-v.y);
+}
+
 void main()	{
     vec2 uv = mix(vUv, eyePos.xy, eyePos.z);
     // float dir = vUv.y < 0.5 ? -1. : 1.;
@@ -336,17 +345,17 @@ void main()	{
     // uv = mix(uv, vec2(0.5), 0.3+sinN(time*0.3)*0.5);
     // float quantDev = pow(sinN(time*0.32), 3.)*300.;
     vec4 samp = texture(passthru, uv);
-    vec4 sampTex = texture(vidFrames, vec3(uv, frameInd));
+    vec4 sampTex = texture(vidFrames, vec3(flipY(uv), frameInd));
     if(useVidTex) samp = sampTex;
     float edgeW = 0.001;
-    vec4 rightEdge = texture(passthru, vec2(1.-edgeW, uv.y));
-    vec4 leftEdge = texture(passthru, vec2(edgeW, uv.y));
+    vec4 rightEdge = texture(vidFrames, vec3(1.-edgeW, 1.-uv.y, frameInd));
+    vec4 leftEdge = texture(vidFrames, vec3(edgeW, 1.-uv.y, frameInd));
     vec4 seamColor = mix(leftEdge, rightEdge, 0.5);
     float blendDist = 0.05;
     vec4 blendVal = mix(seamColor, samp, clamp(vUv.x, 0., blendDist)/blendDist);
     blendVal = mix(seamColor, blendVal, clamp(1.-vUv.x, 0., blendDist)/blendDist);
 
-    gl_FragColor = samp;
+    gl_FragColor = blendVal;
 }`;
 
 let passthruShader = glsl`
