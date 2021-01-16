@@ -5,7 +5,7 @@ import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 
 const gui = new dat.GUI();
-let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 0, useVidTex: true, eyeRotation: 0};
+let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
 gui.add(eyePos, 'xEye', 0, 1, 0.01);
 gui.add(eyePos, 'yEye', 0, 1, 0.01);
 gui.add(eyePos, 'zoom', 0, 1, 0.01);
@@ -15,6 +15,10 @@ gui.add(eyePos, 'vidPos', 0, 1, 0.001).onChange(v => {video.currentTime = video.
 gui.add(eyePos, 'vidTexPos', 0, 200);
 gui.add(eyePos, 'useVidTex');
 gui.add(eyePos, 'eyeRotation', 0, 2, .001);
+gui.add(eyePos, 'yLook', -1, 1, .001);
+gui.add(eyePos, 'zLook', -1, 1, .001);
+gui.add(eyePos, 'rotRad', 0, 1, .001);
+gui.add(eyePos, 'rotAng', 0, 2*Math.PI, .001);
 
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
@@ -86,7 +90,7 @@ function createTextureArray(data, width, height, depth) {
 function createVideoPlacementScene() {
     let plane = new THREE.PlaneBufferGeometry(2, 2);
 
-    let sphere = new THREE.SphereBufferGeometry(0.25, 30, 30);
+    let sphere = new THREE.SphereBufferGeometry(0.25, 130, 130);
 
     let data = new Uint8Array(256*256*3*10);
     let exp2 = i => (i / (256**2 * 3) % 1);
@@ -234,11 +238,13 @@ function animateVideoPlacement() {
     camAnim.setFromSphericalCoords(2, s(time*0.32)*pi, s(time*0.52)*pi)
     const newPos = camAnim.lerp(meshPos, sinN(time*.28)*0.5);
 
-    pCam.position.set(newPos.x, newPos.y, newPos.z);
-    pCam.lookAt(new THREE.Vector3(0, 0, 0));
+    // pCam.position.set(newPos.x, newPos.y, newPos.z);
+    // pCam.lookAt(new THREE.Vector3(0, 0, 0));
 
     videoPlacementMesh.lookAt(pCam.position);
     videoPlacementMesh.rotateY(eyePos.eyeRotation * Math.PI);
+    videoPlacementMesh.rotateY(eyePos.yLook * Math.PI + Math.sin(eyePos.rotAng)*eyePos.rotRad * Math.PI);
+    videoPlacementMesh.rotateZ(eyePos.zLook * Math.PI + Math.cos(eyePos.rotAng)*eyePos.rotRad * Math.PI);
 }
 
 function setVideoPlacementUniforms() {
@@ -311,10 +317,11 @@ void main()	{
   vUv = uv;
 
   vec3 p = position;
-  float posR = rand(p.x*1000. + p.y*905.);
+  float posR = p.x*3.14 + p.y*3.15;
   float t = time + 10000.;
-  float ydev = sin(t * (1.+.3*posR))*0.04;
-//   p.y = p.y + mix(0., ydev, sinN(time+p.x*PI));
+  float ydev = sin(t + posR*3.)*0.07;
+  p.y = p.y + mix(0., ydev, 1.);
+//   p.z = p.z + mix(0., sin(p.y*30.+time)*0.1, 1.);
   gl_Position = projectionMatrix * modelViewMatrix * vec4( p, 1.0 );
 
 }`;
