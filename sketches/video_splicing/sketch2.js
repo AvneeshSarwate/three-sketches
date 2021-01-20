@@ -53,7 +53,8 @@ fetch("/media_assets/eye_raw.rgb").then(async (res) => {
     let rgbData = new Uint8Array(blobArray, 0, width * height * 3 * numFrames);
     videoTextureArray.dispose();
     videoTextureArray = createTextureArray(rgbData, width, height, numFrames);
-    videoPlacementUniforms.vidFrames.value = videoTextureArray;
+    eyeballUniforms_1.vidFrames.value = videoTextureArray;
+    eyeballUniforms_2.vidFrames.value = videoTextureArray;
 });
 
 const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
@@ -61,7 +62,7 @@ const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.in
 let pCam, oCam, feedbackScene, passthruScene, renderer, stats;
 let feedbackUniforms, passthruUniforms;
 
-let videoPlacementScene, videoPlacementUniforms, videoPlacementMesh;
+let videoPlacementScene, eyeballUniforms_1, eyeball_1, eyeballUniforms_2, eyeball_2;
 let simpleEyeScene;
 let videoPlacementTarget = newTarget();
 videoPlacementTarget.depthTexture = new THREE.DepthTexture();
@@ -87,51 +88,65 @@ function createTextureArray(data, width, height, depth) {
     return texture;
 }
 
-function createVideoPlacementScene() {
-    let plane = new THREE.PlaneBufferGeometry(2, 2);
+function createEyeMaterial(videoTexture, videoTextureArray){
+    let uniforms = {
+        passthru:  {value: videoTexture},
+        time :     {value: 0},
+        eyePos:    {value: new THREE.Vector3(.5, .5, .5)},
+        vidFrames: {value: videoTextureArray},
+        useVidTex: {value: true},
+        frameInd:  {value: 0}
+    };
 
+    let material = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: header_code + vidVertWarp,
+        fragmentShader: header_code + vidCutShader
+    });
+    material.side = THREE.DoubleSide;
+
+    return {material, uniforms};
+}
+
+function createEyeMesh(videoTexture, videoTextureArray) {
     let sphere = new THREE.SphereBufferGeometry(0.25, 130, 130);
 
+    let {material, uniforms} = createEyeMaterial(videoTexture, videoTextureArray);
+
+    let mesh = new THREE.Mesh(sphere, material);
+
+    return [mesh, uniforms];
+}
+
+function createEyeballScene() {
+    
     let data = new Uint8Array(256*256*3*10);
     let exp2 = i => (i / (256**2 * 3) % 1);
     data = data.map((e, i) => Math.floor(exp2(i)*256))
     videoTextureArray = createTextureArray(data, 256, 256, 10);
 
-    videoPlacementUniforms = {
-        passthru:  {value: videoTexture},
-        time :     {value: 0},
-        eyePos:    {value: new THREE.Vector3(.5, .5, .5)},
-        vidFrames: {value: videoTextureArray},
-        useVidTex: {value: false},
-        frameInd:  {value: 0}
-    }
+    let eyes_and_uniforms = [0, 1].map(() => createEyeMesh(videoTexture, videoTextureArray));
+    eyeball_1 = eyes_and_uniforms[0][0];
+    eyeball_2 = eyes_and_uniforms[1][0];
+    eyeballUniforms_1 = eyes_and_uniforms[0][1];
+    eyeballUniforms_2 = eyes_and_uniforms[1][1];
 
-    let videoPlacementMaterial = new THREE.ShaderMaterial({
-        uniforms: videoPlacementUniforms,
-        vertexShader: header_code + vidVertWarp,
-        fragmentShader: header_code + vidCutShader
-    });
-    videoPlacementMaterial.side = THREE.DoubleSide;
-
-    videoPlacementMesh = new THREE.Mesh(sphere, videoPlacementMaterial);
-
-    window.vidMesh = videoPlacementMesh;
-
-    videoPlacementMesh.onBeforeRender = function(/*renderer, scene, camera, geometry, material, group*/) {
+    eyeball_1.onBeforeRender = function(/*renderer, scene, camera, geometry, material, group*/) {
         if(eyePos.simplifyEye) {
             this.position.x = this.position.y = 0;
         } else {
             this.position.x = Math.sin(time *.95) * 0.5;
             this.position.y = Math.sin(time *.95*2) * 0.5;
         }
-        
-        // this.position.z = -1*(time%1);
     }
 
     videoPlacementScene = new THREE.Scene();
-    videoPlacementScene.add(videoPlacementMesh);
+    videoPlacementScene.add(eyeball_1);
+    videoPlacementScene.add(eyeball_2);
 
-    let simpleEyeMesh = new THREE.Mesh(plane, videoPlacementMaterial);
+    let {material, uniforms} = createEyeMaterial(videoTexture, videoTextureArray);
+    let plane = new THREE.PlaneBufferGeometry(2, 2);
+    let simpleEyeMesh = new THREE.Mesh(plane, material);
     simpleEyeScene = new THREE.Scene();
     simpleEyeScene.add(simpleEyeMesh);
 }
@@ -209,7 +224,7 @@ function init() {
 
     window.pCam = pCam;
 
-    createVideoPlacementScene();
+    createEyeballScene();
     createFeedbackDisplacementScene();
     createFeedbackScene();
     createPassthroughScene();
@@ -232,7 +247,7 @@ function onWindowResize() {
 }
 
 function animateVideoPlacement() {
-    const meshPos = videoPlacementMesh.position;
+    const meshPos = eyeball_1.position;
     const s = Math.sin, pi = Math.PI;
     const camAnim = new THREE.Vector3();
     camAnim.setFromSphericalCoords(2, s(time*0.32)*pi, s(time*0.52)*pi)
@@ -241,17 +256,17 @@ function animateVideoPlacement() {
     // pCam.position.set(newPos.x, newPos.y, newPos.z);
     // pCam.lookAt(new THREE.Vector3(0, 0, 0));
 
-    videoPlacementMesh.lookAt(pCam.position);
-    videoPlacementMesh.rotateY(eyePos.eyeRotation * Math.PI);
-    videoPlacementMesh.rotateY(eyePos.yLook * Math.PI + Math.sin(eyePos.rotAng)*eyePos.rotRad * Math.PI);
-    videoPlacementMesh.rotateZ(eyePos.zLook * Math.PI + Math.cos(eyePos.rotAng)*eyePos.rotRad * Math.PI);
+    eyeball_1.lookAt(pCam.position);
+    eyeball_1.rotateY(eyePos.eyeRotation * Math.PI);
+    eyeball_1.rotateY(eyePos.yLook * Math.PI + Math.sin(eyePos.rotAng)*eyePos.rotRad * Math.PI);
+    eyeball_1.rotateZ(eyePos.zLook * Math.PI + Math.cos(eyePos.rotAng)*eyePos.rotRad * Math.PI);
 }
 
-function setVideoPlacementUniforms() {
-    videoPlacementUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
-    videoPlacementUniforms.time.value = time;
-    videoPlacementUniforms.useVidTex.value = eyePos.useVidTex;
-    videoPlacementUniforms.frameInd.value = eyePos.vidTexPos;
+function setVideoPlacementUniforms(eyeUniforms) {
+    eyeUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
+    eyeUniforms.time.value = time;
+    eyeUniforms.useVidTex.value = eyePos.useVidTex;
+    eyeUniforms.frameInd.value = eyePos.vidTexPos;
 }
 
 function animate() {
@@ -262,7 +277,7 @@ function animate() {
     if(eyePos.simplifyEye){
         pCam.position.set(0, 0, -1);
         pCam.lookAt(new THREE.Vector3(0, 0, 0));
-        setVideoPlacementUniforms();
+        setVideoPlacementUniforms(eyeballUniforms_1);
         renderer.setRenderTarget(null);
         renderer.render(simpleEyeScene, pCam);
     }
@@ -273,7 +288,7 @@ function animate() {
         renderer.render(feedackDisplacementScene, oCam);
 
         animateVideoPlacement();
-        setVideoPlacementUniforms();
+        setVideoPlacementUniforms(eyeballUniforms_1);
         renderer.setRenderTarget(videoPlacementTarget);
         renderer.render(videoPlacementScene, pCam);
 
