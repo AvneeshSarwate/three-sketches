@@ -21,6 +21,7 @@ gui.add(eyePos, 'yLook', -1, 1, .001);
 gui.add(eyePos, 'zLook', -1, 1, .001);
 gui.add(eyePos, 'rotRad', 0, 1, .001);
 gui.add(eyePos, 'rotAng', 0, 2*Math.PI, .001);
+gui.add(eyePos, 'colorBlast');
 
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
@@ -257,8 +258,8 @@ function animateVideoPlacement() {
     camAnim.setFromSphericalCoords(2, s(time*0.32)*pi, s(time*0.52)*pi)
     const newPos = camAnim.lerp(meshPos, sinN(time*.28)*0.5);
 
-    pCam.position.set(newPos.x, newPos.y, newPos.z);
-    pCam.lookAt(new THREE.Vector3(0, 0, 0));
+    // pCam.position.set(newPos.x, newPos.y, newPos.z);
+    // pCam.lookAt(new THREE.Vector3(0, 0, 0));
 
     eyeball_1.lookAt(pCam.position);
     eyeball_1.rotateY(eyePos.eyeRotation * Math.PI);
@@ -471,7 +472,11 @@ void main()	{
     // col = mix(bb.rgb, samp.rgb, 0.04);
     // if(draw) col = samp.rgb;
 
-    if(distance(eye1, vUv) < 0.05 || distance(eye2, vUv) < 0.05) col = red;
+    float eyeDist1 = distance(eye1, vUv);
+    float eyeDist2 = distance(eye2, vUv);
+    float eyeRad = 0.2;
+    bool inEyeBorder = abs(eyeDist1 - eyeRad) < .03 || abs(eyeDist2 - eyeRad) < .03;
+    if(inEyeBorder && !draw && setColorRing) col = red;
 
     gl_FragColor = vec4(col, fdbk);
 }
