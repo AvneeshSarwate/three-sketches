@@ -6,6 +6,8 @@ import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 
 const gui = new dat.GUI();
 let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
+let setColorRing = false;
+eyePos.colorBlast = () => {setColorRing = true;}
 gui.add(eyePos, 'xEye', 0, 1, 0.01);
 gui.add(eyePos, 'yEye', 0, 1, 0.01);
 gui.add(eyePos, 'zoom', 0, 1, 0.01);
@@ -177,7 +179,10 @@ function createFeedbackScene(){
         scene:      { value: videoPlacementTarget.texture},
         depth:      { value: videoPlacementTarget.depthTexture},
         displacement: {value: feedbackDisplacementTarget.texture},
-        time :      { value : 0}
+        time :      { value : 0},
+        eyePos1:    { value: new THREE.Vector2()},
+        eyePos2:    { value: new THREE.Vector2()},
+        setColorRing: {value : false}
     } 
 
     let feedbackMaterial = new THREE.ShaderMaterial({
@@ -218,6 +223,7 @@ function init() {
 
     pCam = new THREE.PerspectiveCamera( 90, 1, 0.1, 1000 );
     pCam.position.z = 1;
+    pCam.updateMatrixWorld();
     oCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
     window.pCam = pCam;
@@ -251,8 +257,8 @@ function animateVideoPlacement() {
     camAnim.setFromSphericalCoords(2, s(time*0.32)*pi, s(time*0.52)*pi)
     const newPos = camAnim.lerp(meshPos, sinN(time*.28)*0.5);
 
-    // pCam.position.set(newPos.x, newPos.y, newPos.z);
-    // pCam.lookAt(new THREE.Vector3(0, 0, 0));
+    pCam.position.set(newPos.x, newPos.y, newPos.z);
+    pCam.lookAt(new THREE.Vector3(0, 0, 0));
 
     eyeball_1.lookAt(pCam.position);
     eyeball_1.rotateY(eyePos.eyeRotation * Math.PI);
@@ -265,6 +271,24 @@ function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.time.value = time;
     eyeUniforms.useVidTex.value = eyePos.useVidTex;
     eyeUniforms.frameInd.value = eyePos.vidTexPos;
+}
+
+function setFeedbackUniforms() {
+    feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
+    feedbackUniforms.time.value = time;
+    feedbackUniforms.setColorRing.value = setColorRing;
+    
+    pCam.updateMatrixWorld();
+
+    let eyeScreen1 = eyeball_1.position.clone();
+    eyeScreen1.project(pCam);
+    feedbackUniforms.eyePos1.value = eyeScreen1;
+
+    let eyeScreen2 = eyeball_2.position.clone();
+    eyeScreen2.project(pCam);
+    feedbackUniforms.eyePos2.value = eyeScreen2;
+
+    setColorRing = false;
 }
 
 function animate() {
@@ -291,8 +315,7 @@ function animate() {
         renderer.setRenderTarget(videoPlacementTarget);
         renderer.render(eyeballScene, pCam);
 
-        feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
-        feedbackUniforms.time.value = time;
+        setFeedbackUniforms();
         renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
         renderer.render(feedbackScene, oCam);
 
@@ -405,6 +428,9 @@ uniform sampler2D scene;
 uniform sampler2D backbuffer;
 uniform sampler2D depth;
 uniform sampler2D displacement;
+uniform bool setColorRing;
+uniform vec3 eyePos1;
+uniform vec3 eyePos2;
 
 vec2 xySignCompose(vec4 xy){
     float x = xy.x + (-1.*xy.y);
@@ -413,6 +439,9 @@ vec2 xySignCompose(vec4 xy){
 }
 
 void main()	{
+    vec2 eye1 = (eyePos1.xy + 1.)/2.;
+    vec2 eye2 = (eyePos2.xy + 1.)/2.;
+
     float PI = 3.14159;
 
     vec2 bbN = mix(vUv, coordWarp(vUv, time).xy, 0.005);
@@ -441,6 +470,8 @@ void main()	{
     col = mix(black, col, fdbk < 0.01 ? 0. : 1.);
     // col = mix(bb.rgb, samp.rgb, 0.04);
     // if(draw) col = samp.rgb;
+
+    if(distance(eye1, vUv) < 0.05 || distance(eye2, vUv) < 0.05) col = red;
 
     gl_FragColor = vec4(col, fdbk);
 }
