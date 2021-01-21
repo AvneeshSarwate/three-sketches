@@ -55,6 +55,7 @@ fetch("/media_assets/eye_raw.rgb").then(async (res) => {
     videoTextureArray = createTextureArray(rgbData, width, height, numFrames);
     eyeballUniforms_1.vidFrames.value = videoTextureArray;
     eyeballUniforms_2.vidFrames.value = videoTextureArray;
+    simplifyUniforms.vidFrames.value = videoTextureArray;
 });
 
 const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
@@ -62,7 +63,7 @@ const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.in
 let pCam, oCam, feedbackScene, passthruScene, renderer, stats;
 let feedbackUniforms, passthruUniforms;
 
-let videoPlacementScene, eyeballUniforms_1, eyeball_1, eyeballUniforms_2, eyeball_2;
+let eyeballScene, eyeballUniforms_1, eyeball_1, eyeballUniforms_2, eyeball_2, simplifyUniforms;
 let simpleEyeScene;
 let videoPlacementTarget = newTarget();
 videoPlacementTarget.depthTexture = new THREE.DepthTexture();
@@ -88,7 +89,7 @@ function createTextureArray(data, width, height, depth) {
     return texture;
 }
 
-function createEyeMaterial(videoTexture, videoTextureArray){
+function createEyeMaterial(videoTexture, videoTextureArray, vertShader){
     let uniforms = {
         passthru:  {value: videoTexture},
         time :     {value: 0},
@@ -100,7 +101,7 @@ function createEyeMaterial(videoTexture, videoTextureArray){
 
     let material = new THREE.ShaderMaterial({
         uniforms: uniforms,
-        vertexShader: header_code + vidVertWarp,
+        vertexShader: header_code + vertShader,
         fragmentShader: header_code + vidCutShader
     });
     material.side = THREE.DoubleSide;
@@ -111,7 +112,7 @@ function createEyeMaterial(videoTexture, videoTextureArray){
 function createEyeMesh(videoTexture, videoTextureArray) {
     let sphere = new THREE.SphereBufferGeometry(0.25, 130, 130);
 
-    let {material, uniforms} = createEyeMaterial(videoTexture, videoTextureArray);
+    let {material, uniforms} = createEyeMaterial(videoTexture, videoTextureArray, vidVertWarp);
 
     let mesh = new THREE.Mesh(sphere, material);
 
@@ -132,19 +133,16 @@ function createEyeballScene() {
     eyeballUniforms_2 = eyes_and_uniforms[1][1];
 
     eyeball_1.onBeforeRender = function(/*renderer, scene, camera, geometry, material, group*/) {
-        if(eyePos.simplifyEye) {
-            this.position.x = this.position.y = 0;
-        } else {
-            this.position.x = Math.sin(time *.95) * 0.5;
-            this.position.y = Math.sin(time *.95*2) * 0.5;
-        }
+        this.position.x = Math.sin(time *.95) * 0.5;
+        this.position.y = Math.sin(time *.95*2) * 0.5;
     }
 
-    videoPlacementScene = new THREE.Scene();
-    videoPlacementScene.add(eyeball_1);
-    videoPlacementScene.add(eyeball_2);
+    eyeballScene = new THREE.Scene();
+    eyeballScene.add(eyeball_1);
+    eyeballScene.add(eyeball_2);
 
-    let {material, uniforms} = createEyeMaterial(videoTexture, videoTextureArray);
+    let {material, uniforms} = createEyeMaterial(videoTexture, videoTextureArray, vertexShader);
+    simplifyUniforms = uniforms;
     let plane = new THREE.PlaneBufferGeometry(2, 2);
     let simpleEyeMesh = new THREE.Mesh(plane, material);
     simpleEyeScene = new THREE.Scene();
@@ -262,7 +260,7 @@ function animateVideoPlacement() {
     eyeball_1.rotateZ(eyePos.zLook * Math.PI + Math.cos(eyePos.rotAng)*eyePos.rotRad * Math.PI);
 }
 
-function setVideoPlacementUniforms(eyeUniforms) {
+function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
     eyeUniforms.time.value = time;
     eyeUniforms.useVidTex.value = eyePos.useVidTex;
@@ -277,7 +275,7 @@ function animate() {
     if(eyePos.simplifyEye){
         pCam.position.set(0, 0, -1);
         pCam.lookAt(new THREE.Vector3(0, 0, 0));
-        setVideoPlacementUniforms(eyeballUniforms_1);
+        setVideoPlacementUniforms(simplifyUniforms);
         renderer.setRenderTarget(null);
         renderer.render(simpleEyeScene, pCam);
     }
@@ -288,9 +286,10 @@ function animate() {
         renderer.render(feedackDisplacementScene, oCam);
 
         animateVideoPlacement();
-        setVideoPlacementUniforms(eyeballUniforms_1);
+        setVideoPlacementUniforms(eyeballUniforms_1, 1);
+        setVideoPlacementUniforms(eyeballUniforms_2, 2);
         renderer.setRenderTarget(videoPlacementTarget);
-        renderer.render(videoPlacementScene, pCam);
+        renderer.render(eyeballScene, pCam);
 
         feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
         feedbackUniforms.time.value = time;
