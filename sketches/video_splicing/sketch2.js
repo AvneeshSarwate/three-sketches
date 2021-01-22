@@ -3,6 +3,9 @@ import Stats from "../../stats.module.js";
 import header_code from "../../header_frag.js";
 import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
+import {oscV} from '../../utilities/oscManager.js';
+
+window.oscV = oscV;
 
 const gui = new dat.GUI();
 let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
@@ -180,7 +183,7 @@ function createFeedbackScene(){
         scene:      { value: videoPlacementTarget.texture},
         depth:      { value: videoPlacementTarget.depthTexture},
         displacement: {value: feedbackDisplacementTarget.texture},
-        time :      { value : 0},
+        time :      { value: 0},
         eyePos1:    { value: new THREE.Vector2()},
         eyePos2:    { value: new THREE.Vector2()},
         setColorRing: {value : false}
