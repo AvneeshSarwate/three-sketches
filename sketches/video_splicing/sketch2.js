@@ -5,8 +5,6 @@ import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 import {oscV} from '../../utilities/oscManager.js';
 
-window.oscV = oscV;
-
 const gui = new dat.GUI();
 let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
 let setColorRing = false;
@@ -254,7 +252,7 @@ function onWindowResize() {
     [feedbackTargets, feedbackDisplacementTarget, videoPlacementTarget].flat().map(t => t.setSize(window.innerWidth, window.innerHeight));
 }
 
-function animateVideoPlacement() {
+function animateEyeballs() {
     const meshPos = eyeball_1.position;
     const s = Math.sin, pi = Math.PI;
     const camAnim = new THREE.Vector3();
@@ -266,6 +264,9 @@ function animateVideoPlacement() {
 
     eyeball_1.lookAt(pCam.position);
     eyeball_1.rotateY(eyePos.eyeRotation * Math.PI);
+    eyeball_2.lookAt(pCam.position);
+    eyeball_2.rotateY(eyePos.eyeRotation * Math.PI);
+    
     eyeball_1.rotateY(eyePos.yLook * Math.PI + Math.sin(eyePos.rotAng)*eyePos.rotRad * Math.PI);
     eyeball_1.rotateZ(eyePos.zLook * Math.PI + Math.cos(eyePos.rotAng)*eyePos.rotRad * Math.PI);
 }
@@ -313,7 +314,7 @@ function animate() {
         renderer.setRenderTarget(feedbackDisplacementTarget);
         renderer.render(feedackDisplacementScene, oCam);
 
-        animateVideoPlacement();
+        animateEyeballs();
         setVideoPlacementUniforms(eyeballUniforms_1, 1);
         setVideoPlacementUniforms(eyeballUniforms_2, 2);
         renderer.setRenderTarget(videoPlacementTarget);
