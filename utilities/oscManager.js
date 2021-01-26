@@ -2,6 +2,19 @@
 
 let oscValueStorage = {};
 
+class OscHandler {
+    constructor(){
+        this.handlers = {}
+    }
+
+    //handler functions take a single array of args and should use destructuring assignment
+    setHandler(addr, msgHandler){
+        this.handlers[addr] = msgHandler
+    }
+}
+
+let oscHandler = new OscHandler();
+
 let oscPort = new osc.WebSocketPort({
     url: "ws://localhost:8081"
 });
@@ -17,6 +30,9 @@ oscPort.on("message", (message) => {
 
     oscValueStorage[addrKey].v = args;
     oscValueStorage[addrKey].unread = true;
+
+    let msgHanlder = oscHandler.handlers[address];
+    if(msgHanlder) msgHanlder(args); 
 })
 
 
@@ -33,4 +49,7 @@ let proxyHandler = {
 
 let oscProxy = new Proxy(oscValueStorage, proxyHandler);
 
-export {oscProxy as oscV};
+export {
+    oscProxy as oscV,
+    oscHandler as oscH
+};

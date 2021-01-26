@@ -3,7 +3,14 @@ import Stats from "../../stats.module.js";
 import header_code from "../../header_frag.js";
 import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
-import {oscV} from '../../utilities/oscManager.js';
+import {Gesture, gestureManager} from '../../utilities/animationManager.js';
+import {oscV, oscH} from '../../utilities/oscManager.js';
+
+
+let eye1rot_gest = new Gesture('eye1rot', (gTime, gPhase, delta, gest) => {
+    eyeball_1.rotateY(gPhase * Math.PI);
+});
+oscH.setHandler('/eye1rot', () => eye1rot_gest.start())
 
 const gui = new dat.GUI();
 let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
@@ -252,7 +259,7 @@ function onWindowResize() {
     [feedbackTargets, feedbackDisplacementTarget, videoPlacementTarget].flat().map(t => t.setSize(window.innerWidth, window.innerHeight));
 }
 
-function animateEyeballs() {
+function setBaseEyeRotations() {
     const meshPos = eyeball_1.position;
     const s = Math.sin, pi = Math.PI;
     const camAnim = new THREE.Vector3();
@@ -266,9 +273,9 @@ function animateEyeballs() {
     eyeball_1.rotateY(eyePos.eyeRotation * Math.PI);
     eyeball_2.lookAt(pCam.position);
     eyeball_2.rotateY(eyePos.eyeRotation * Math.PI);
-    
-    eyeball_1.rotateY(eyePos.yLook * Math.PI + Math.sin(eyePos.rotAng)*eyePos.rotRad * Math.PI);
-    eyeball_1.rotateZ(eyePos.zLook * Math.PI + Math.cos(eyePos.rotAng)*eyePos.rotRad * Math.PI);
+
+    // eyeball_1.rotateY(eyePos.yLook * Math.PI + Math.sin(eyePos.rotAng)*eyePos.rotRad * Math.PI);
+    // eyeball_1.rotateZ(eyePos.zLook * Math.PI + Math.cos(eyePos.rotAng)*eyePos.rotRad * Math.PI);
 }
 
 function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
@@ -314,9 +321,10 @@ function animate() {
         renderer.setRenderTarget(feedbackDisplacementTarget);
         renderer.render(feedackDisplacementScene, oCam);
 
-        animateEyeballs();
+        setBaseEyeRotations();
         setVideoPlacementUniforms(eyeballUniforms_1, 1);
         setVideoPlacementUniforms(eyeballUniforms_2, 2);
+        gestureManager.tick();
         renderer.setRenderTarget(videoPlacementTarget);
         renderer.render(eyeballScene, pCam);
 
