@@ -7,10 +7,15 @@ import {Gesture, gestureManager} from '../../utilities/animationManager.js';
 import {oscV, oscH} from '../../utilities/oscManager.js';
 
 
-let eye1rot_gest = new Gesture('eye1rot', (gTime, gPhase, delta, gest) => {
-    eyeball_1.rotateY(gPhase * Math.PI);
-});
-oscH.setHandler('/eye1rot', () => eye1rot_gest.start())
+let eyeTransforms = {
+    eye1rot: 0
+};
+
+let eye1rot_gest = new Gesture('eye1rot', (gTime, gPhase, delta, deltaPhase, gest) => {
+    eyeTransforms.eye1rot = gPhase * Math.PI *2;
+}, null, null, 1);
+window.gest = eye1rot_gest;
+oscH.setHandler('/eye1rot', ([vel]) =>  vel > 0 ? eye1rot_gest.start(vel/127 * 4) : 0 )
 
 const gui = new dat.GUI();
 let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
@@ -91,6 +96,8 @@ let fdbkInd = 0;
 
 let time;
 let startTime = performance.now()/1000;
+
+window.eye1 = eyeball_1;
 
 function createTextureArray(data, width, height, depth) {
     const texture = new THREE.DataTexture2DArray( data, width, height, depth );
@@ -278,6 +285,10 @@ function setBaseEyeRotations() {
     // eyeball_1.rotateZ(eyePos.zLook * Math.PI + Math.cos(eyePos.rotAng)*eyePos.rotRad * Math.PI);
 }
 
+function setEyeAnimationTransforms(){
+    eyeball_1.rotateY(eyeTransforms.eye1rot);
+}
+
 function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
     eyeUniforms.time.value = time;
@@ -325,6 +336,7 @@ function animate() {
         setVideoPlacementUniforms(eyeballUniforms_1, 1);
         setVideoPlacementUniforms(eyeballUniforms_2, 2);
         gestureManager.tick();
+        setEyeAnimationTransforms();
         renderer.setRenderTarget(videoPlacementTarget);
         renderer.render(eyeballScene, pCam);
 

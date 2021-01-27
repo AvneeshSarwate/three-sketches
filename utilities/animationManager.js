@@ -21,9 +21,7 @@ class GestureManager {
 
     //need to call this every frame to run the gestures defined
     tick() {
-        for(let g in this.playingGestures) {
-            g.step();
-        }
+        this.playingGestures.forEach(g => g.step());
     }
 }
 
@@ -55,12 +53,14 @@ class Gesture {
         this.timeFunc = timeFunc ? timeFunc : () => Date.now()/1000;
         this.numLoop = numLoop ? numLoop : Number.POSITIVE_INFINITY;
         this.setupFunc = setupFunc ? setupFunc : a => a; 
+        this.state = {};
 
         this.lastTime = 0;
         this.time = 0;
         this.startTime = 0;
         this.isPlaying = false;
         this.id = null; //set by the gesture manager
+        this.scale = 1;
 
         gestureManager.add(key, this);
 
@@ -73,13 +73,14 @@ class Gesture {
     }
 
     //TODO - resumable - clean up semantics of start/stop/pause/resume wrt various instance variables and resetting
-    start() {
-        this.setupFunc();
+    start(scale = 1) {
+        this.scale = scale;
         this.startTime = this.timeFunc();
         this.time = this.timeFunc(); //this might enable the note in TODO - resumable?
         this.isPlaying = true;
         this.reset();
         gestureManager.playingGestures.add(this);
+        this.setupFunc(this.state);
     }
     
     pause() {
@@ -101,13 +102,14 @@ class Gesture {
         if(this.isPlaying) {
             this.lastTime = this.time;
             this.time = this.timeFunc();
-            let delta = this.time - this.lastTime;
+            let delta = (this.time - this.lastTime) * this.scale;
+            let deltaPhase = delta/this.duration;
             let phase = ((this.time - this.startTime) / this.duration) % 1;
 
             this.accumulatedTime += delta;
-            this.accumulatedPhase = (this.accumulatedPhase + delta/this.duration) % 1;
+            this.accumulatedPhase += deltaPhase; //mod it manually in the animation
 
-            this.gestureFunc(this.accumulatedTime, this.accumulatedPhase, delta, this);
+            this.gestureFunc(this.accumulatedTime, this.accumulatedPhase, delta, deltaPhase, this);
         }
         if(this.accumulatedTime > this.duration * this.numLoop) {
             this.isPlaying = false;

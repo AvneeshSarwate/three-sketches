@@ -24,7 +24,7 @@ oscPort.open();
 oscPort.on("message", (message) => {
     let {address, args} = message;
     let addrKey = address.slice(1);
-    console.log("osc", message);
+    // console.log("osc", message);
 
     if(!oscValueStorage[addrKey]) oscValueStorage[addrKey] = {};
 
