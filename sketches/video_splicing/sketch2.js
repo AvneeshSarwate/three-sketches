@@ -8,14 +8,19 @@ import {oscV, oscH} from '../../utilities/oscManager.js';
 
 
 let eyeTransforms = {
-    eye1rot: 0
+    eye1rot: 0,
+    eye2rot: 0,
 };
 
 let eye1rot_gest = new Gesture('eye1rot', (gTime, gPhase, delta, deltaPhase, gest) => {
     eyeTransforms.eye1rot = gPhase * Math.PI *2;
 }, null, null, 1);
-window.gest = eye1rot_gest;
-oscH.setHandler('/eye1rot', ([vel]) =>  vel > 0 ? eye1rot_gest.start(vel/127 * 4) : 0 )
+oscH.setHandler('/eye1rot', ([vel]) =>  vel > 0 ? eye1rot_gest.start(vel/127 * 4) : 0 );
+
+let eye2rot_gest = new Gesture('eye2rot', (gTime, gPhase, delta, deltaPhase, gest) => {
+    eyeTransforms.eye2rot = gPhase * Math.PI *2;
+}, null, null, 1);
+oscH.setHandler('/eye2rot', ([vel]) =>  vel > 0 ? eye2rot_gest.start(vel/127 * 4) : 0 )
 
 const gui = new dat.GUI();
 let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
@@ -150,10 +155,8 @@ function createEyeballScene() {
     eyeballUniforms_1 = eyes_and_uniforms[0][1];
     eyeballUniforms_2 = eyes_and_uniforms[1][1];
 
-    eyeball_1.onBeforeRender = function(/*renderer, scene, camera, geometry, material, group*/) {
-        this.position.x = Math.sin(time *.95) * 0.5;
-        this.position.y = Math.sin(time *.95*2) * 0.5;
-    }
+    eyeball_1.position.x = -0.5;
+    eyeball_2.position.x = 0.5;
 
     eyeballScene = new THREE.Scene();
     eyeballScene.add(eyeball_1);
@@ -171,7 +174,9 @@ function createFeedbackDisplacementScene() {
     let plane = new THREE.PlaneBufferGeometry(2, 2);
 
     feedbackDisplacementUniforms = {
-        time: {value: 0}
+        time:   {value: 0},
+        param1: {value: 0},
+        param2: {value: 0}
     }
 
     let material = new THREE.ShaderMaterial({
@@ -287,6 +292,7 @@ function setBaseEyeRotations() {
 
 function setEyeAnimationTransforms(){
     eyeball_1.rotateY(eyeTransforms.eye1rot);
+    eyeball_2.rotateY(eyeTransforms.eye2rot);
 }
 
 function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
@@ -294,6 +300,12 @@ function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.time.value = time;
     eyeUniforms.useVidTex.value = eyePos.useVidTex;
     eyeUniforms.frameInd.value = eyePos.vidTexPos;
+}
+
+function setFeedbackDisplacementUniforms(){
+    feedbackDisplacementUniforms.time.value = time;
+    feedbackDisplacementUniforms.param1.value = oscV.fdbk_dsp1.v;
+    feedbackDisplacementUniforms.param2.value = oscV.fdbk_dsp2.v;
 }
 
 function setFeedbackUniforms() {
@@ -328,7 +340,7 @@ function animate() {
     }
 
     else {
-        feedbackDisplacementUniforms.time.value = time;
+        setFeedbackDisplacementUniforms();
         renderer.setRenderTarget(feedbackDisplacementTarget);
         renderer.render(feedackDisplacementScene, oCam);
 
@@ -373,6 +385,7 @@ let vidVertWarp = glsl`
 varying vec2 vUv;
 
 uniform float time;
+uniform float eyeSquish;
 
 void main()	{
 
@@ -383,7 +396,7 @@ void main()	{
   float t = time + 10000.;
   float ydev = sin(t + posR*3.)*0.07;
   p.y = p.y + mix(0., ydev, 1.);
-//   p.z = p.z + mix(0., sin(p.y*30.+time)*0.1, 1.);
+  p = mix(position, p, eyeSquish);
   gl_Position = projectionMatrix * modelViewMatrix * vec4( p, 1.0 );
 
 }`;
@@ -435,14 +448,29 @@ void main()	{
 let feedbackDisplacementShader = glsl`
 varying vec2 vUv;
 uniform float time;
+uniform float param1;
+uniform float param2;
 
 vec4 xySignSplit(vec2 xy){
     return vec4(max(xy.x, 0.), abs(min(xy.x, 0.)), max(xy.y, 0.), abs(min(xy.y, 0.)));
 }
 
+vec2 xyHalves(){
+    return mix(vec2(sign(vUv.y-0.5), 0.), vec2(0., sign(vUv.x-0.5)), sinN(time*0.3)) * 0.003;
+}
+
+vec2 randomSink() {
+    vec2 sink = vec2(param1, param2);
+    return mix(vUv, sink, 0.1);
+}
+
+vec2 spiral() {
+    return rotate(vUv, vec2(0.5), (distance(vUv, vec2(0.5)) * 0.1));
+}
+
 void main()	{
-    vec2 dir = mix(vec2(sign(vUv.y-0.5), 0.), vec2(0., sign(vUv.x-0.5)), sinN(time*0.3));
-    gl_FragColor = xySignSplit(dir*0.003);
+    vec2 dir = vUv - randomSink();
+    gl_FragColor = xySignSplit(dir);
 }`;
 
 let feedbackShader = glsl`
@@ -486,7 +514,7 @@ void main()	{
 
     float decay = 0.001;
     bool draw = dep.r < 1.;
-    float last_fdbk = bb2.a;
+    float last_fdbk = bb.a;
     float fdbk = draw ? 1. : last_fdbk - decay;
     fdbk = max(0., fdbk);
 
