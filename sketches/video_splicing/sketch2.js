@@ -37,7 +37,7 @@ oscH.setHandler('/blink_2', ([vel]) =>  vel > 0 ? eye2blink_gest.start(vel/127 *
 
 
 const gui = new dat.GUI();
-let eyePos = { xEye: 0.37, yEye: 0.34, zoom: 0.33, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
+let eyePos = { xEye: 0.37, yEye: 0.34, zoom: 0.33, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0, blinkRoll: 0};
 let setColorRing = false;
 eyePos.colorBlast = () => {setColorRing = true;}
 gui.add(eyePos, 'xEye', 0, 1, 0.01);
@@ -54,6 +54,7 @@ gui.add(eyePos, 'zLook', -1, 1, .001);
 gui.add(eyePos, 'rotRad', 0, 1, .001);
 gui.add(eyePos, 'rotAng', 0, 2*Math.PI, .001);
 gui.add(eyePos, 'colorBlast');
+gui.add(eyePos, 'blinkRoll', 0, 6.282, 0.01);
 
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
@@ -133,7 +134,8 @@ function createEyeMaterial(videoTexture, videoTextureArray, vertShader){
         eyePos:    {value: new THREE.Vector3(.5, .5, .5)},
         vidFrames: {value: videoTextureArray},
         useVidTex: {value: true},
-        frameInd:  {value: 1}
+        frameInd:  {value: 1},
+        blinkRoll: {value: 0}
     };
 
     let material = new THREE.ShaderMaterial({
@@ -313,6 +315,7 @@ function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
     eyeUniforms.time.value = time;
     eyeUniforms.useVidTex.value = eyePos.useVidTex;
+    eyeUniforms.blinkRoll.value = eyePos.blinkRoll;
     // eyeUniforms.frameInd.value = eyePos.vidTexPos;
 }
 
@@ -425,9 +428,14 @@ uniform vec3 eyePos;
 uniform sampler3D vidFrames;
 uniform float frameInd;
 uniform bool useVidTex;
+uniform float blinkRoll;
 
 vec2 flipY(vec2 v){
     return vec2(v.x, 1.-v.y);
+}
+
+float blinkRange(float a){
+    return mix(132., 49., (0.5 - abs(a-0.5))*2.)/132.;
 }
 
 void main()	{
@@ -438,7 +446,7 @@ void main()	{
     // uv = mix(uv, vec2(0.5), 0.3+sinN(time*0.3)*0.5);
     // float quantDev = pow(sinN(time*0.32), 3.)*300.;
     vec4 samp = texture(passthru, uv);
-    vec4 sampTex = texture(vidFrames, vec3(flipY(uv), frameInd));
+    vec4 sampTex = texture(vidFrames, vec3(flipY(uv), frameInd*0. + blinkRange(sinN(time+vUv.x*blinkRoll))));
     if(useVidTex) samp = sampTex;
     float edgeW = 0.001;
     vec4 rightEdge = texture(vidFrames, vec3(1.-edgeW, 1.-uv.y, frameInd));
