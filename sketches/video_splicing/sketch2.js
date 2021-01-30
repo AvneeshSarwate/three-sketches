@@ -12,18 +12,32 @@ let eyeTransforms = {
     eye2rot: 0,
 };
 
-let eye1rot_gest = new Gesture('eye1rot', (gTime, gPhase, delta, deltaPhase, gest) => {
+let lerp = (n1, n2, a) => (1-a)*n1 + a*n2;
+let upDown = a => (0.5 - Math.abs(a-0.5))*2
+
+let eye1rot_gest = new Gesture('rotate_1', (gTime, gPhase) => {
     eyeTransforms.eye1rot = gPhase * Math.PI *2;
 }, null, null, 1);
-oscH.setHandler('/eye1rot', ([vel]) =>  vel > 0 ? eye1rot_gest.start(vel/127 * 4) : 0 );
+oscH.setHandler('/rotate_1', ([vel]) =>  vel > 0 ? eye1rot_gest.start(vel/127 * 4) : 0 );
 
-let eye2rot_gest = new Gesture('eye2rot', (gTime, gPhase, delta, deltaPhase, gest) => {
+let eye2rot_gest = new Gesture('rotate_2', (gTime, gPhase) => {
     eyeTransforms.eye2rot = gPhase * Math.PI *2;
 }, null, null, 1);
-oscH.setHandler('/eye2rot', ([vel]) =>  vel > 0 ? eye2rot_gest.start(vel/127 * 4) : 0 )
+oscH.setHandler('/rotate_2', ([vel]) =>  vel > 0 ? eye2rot_gest.start(vel/127 * 4) : 0 );
+
+let eye1blink_gest = new Gesture('blink_1', (gTime, gPhase) => {
+    eyeballUniforms_1.frameInd.value = Math.floor( lerp(132, 49, upDown(gPhase)) );
+}, null, null, 1);
+oscH.setHandler('/blink_1', ([vel]) =>  vel > 0 ? eye1blink_gest.start(vel/127 * 4) : 0 );
+
+let eye2blink_gest = new Gesture('blink_2', (gTime, gPhase) => {
+    eyeballUniforms_2.frameInd.value = Math.floor( lerp(132, 49, upDown(gPhase)) );
+}, null, null, 1);
+oscH.setHandler('/blink_2', ([vel]) =>  vel > 0 ? eye2blink_gest.start(vel/127 * 4) : 0 );
+
 
 const gui = new dat.GUI();
-let eyePos = { xEye: 0.3, yEye: 0.3, zoom: 0.5, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
+let eyePos = { xEye: 0.37, yEye: 0.34, zoom: 0.33, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0};
 let setColorRing = false;
 eyePos.colorBlast = () => {setColorRing = true;}
 gui.add(eyePos, 'xEye', 0, 1, 0.01);
@@ -32,7 +46,7 @@ gui.add(eyePos, 'zoom', 0, 1, 0.01);
 gui.add(eyePos, 'simplifyEye');
 gui.add(eyePos, 'vidScrub').onChange(v => v ? video.pause() : video.play());
 gui.add(eyePos, 'vidPos', 0, 1, 0.001).onChange(v => {video.currentTime = video.duration * v});
-gui.add(eyePos, 'vidTexPos', 0, 200);
+gui.add(eyePos, 'vidTexPos', 0, 133);
 gui.add(eyePos, 'useVidTex');
 gui.add(eyePos, 'eyeRotation', 0, 2, .001);
 gui.add(eyePos, 'yLook', -1, 1, .001);
@@ -65,10 +79,10 @@ window.onbeforeunload = function(){
     videoTextureArray.dispose();
 }
 
-fetch("/media_assets/eye_raw.rgb").then(async (res) => {
-    console.log("eye_raw loaded");
+fetch("/media_assets/blink1.rgb").then(async (res) => {
+    console.log("blink1 loaded");
     // return
-    const  width = 384, height = 216, numFrames = 200;
+    const  width = 960, height = 540, numFrames = 133;
     let rgbBlob = await res.blob();
     let blobArray = await rgbBlob.arrayBuffer();
     let rgbData = new Uint8Array(blobArray, 0, width * height * 3 * numFrames);
@@ -299,7 +313,7 @@ function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
     eyeUniforms.time.value = time;
     eyeUniforms.useVidTex.value = eyePos.useVidTex;
-    eyeUniforms.frameInd.value = eyePos.vidTexPos;
+    // eyeUniforms.frameInd.value = eyePos.vidTexPos;
 }
 
 function setFeedbackDisplacementUniforms(){
