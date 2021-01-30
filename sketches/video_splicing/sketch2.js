@@ -26,12 +26,12 @@ let eye2rot_gest = new Gesture('rotate_2', (gTime, gPhase) => {
 oscH.setHandler('/rotate_2', ([vel]) =>  vel > 0 ? eye2rot_gest.start(vel/127 * 4) : 0 );
 
 let eye1blink_gest = new Gesture('blink_1', (gTime, gPhase) => {
-    eyeballUniforms_1.frameInd.value = Math.floor( lerp(132, 49, upDown(gPhase)) );
+    eyeballUniforms_1.frameInd.value = lerp(132, 49, upDown(gPhase)) / 132;
 }, null, null, 1);
 oscH.setHandler('/blink_1', ([vel]) =>  vel > 0 ? eye1blink_gest.start(vel/127 * 4) : 0 );
 
 let eye2blink_gest = new Gesture('blink_2', (gTime, gPhase) => {
-    eyeballUniforms_2.frameInd.value = Math.floor( lerp(132, 49, upDown(gPhase)) );
+    eyeballUniforms_2.frameInd.value = lerp(132, 49, upDown(gPhase)) / 132;
 }, null, null, 1);
 oscH.setHandler('/blink_2', ([vel]) =>  vel > 0 ? eye2blink_gest.start(vel/127 * 4) : 0 );
 
@@ -119,7 +119,7 @@ let startTime = performance.now()/1000;
 window.eye1 = eyeball_1;
 
 function createTextureArray(data, width, height, depth) {
-    const texture = new THREE.DataTexture2DArray( data, width, height, depth );
+    const texture = new THREE.DataTexture3D( data, width, height, depth );
     texture.format = THREE.RGBFormat;
     texture.type = THREE.UnsignedByteType;
     texture.anistropy = 4;
@@ -133,7 +133,7 @@ function createEyeMaterial(videoTexture, videoTextureArray, vertShader){
         eyePos:    {value: new THREE.Vector3(.5, .5, .5)},
         vidFrames: {value: videoTextureArray},
         useVidTex: {value: true},
-        frameInd:  {value: 0}
+        frameInd:  {value: 1}
     };
 
     let material = new THREE.ShaderMaterial({
@@ -416,14 +416,14 @@ void main()	{
 }`;
 
 let vidCutShader = glsl`
-precision highp sampler2DArray;
+precision highp sampler3D;
 
 varying vec2 vUv;
 uniform sampler2D passthru;
 uniform float time;
 uniform vec3 eyePos;
-uniform sampler2DArray vidFrames;
-uniform int frameInd;
+uniform sampler3D vidFrames;
+uniform float frameInd;
 uniform bool useVidTex;
 
 vec2 flipY(vec2 v){
