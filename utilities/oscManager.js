@@ -30,6 +30,7 @@ oscPort.on("message", (message) => {
 
     oscValueStorage[addrKey].v = args;
     oscValueStorage[addrKey].unread = true;
+    oscValueStorage[addrKey].seen = true;
 
     let msgHanlder = oscHandler.handlers[address];
     if(msgHanlder) msgHanlder(args); 
@@ -40,7 +41,7 @@ let proxyHandler = {
     get: (target, prop, reciever) => {
         let retVal = target[prop] ?
             { v: target[prop].v, unread: target[prop].unread, seen: true}
-        :   {v: 0, unread: true, seen: false }
+        :   { v: 0, unread: true, seen: false }
         if(target[prop]) target[prop].unread = false;
         return retVal;
     }

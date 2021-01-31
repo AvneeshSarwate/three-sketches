@@ -113,6 +113,8 @@ let feedbackDisplacementTarget = newTarget();
 let feedbackTargets = [0,1].map(newTarget);
 let fdbkInd = 0;
 
+let initalCamPos = new THREE.Vector3(0, 0, 1);
+
 
 let time;
 let startTime = performance.now()/1000;
@@ -292,10 +294,11 @@ function setBaseEyeRotations() {
     const s = Math.sin, pi = Math.PI;
     const camAnim = new THREE.Vector3();
     camAnim.setFromSphericalCoords(2, s(time*0.32)*pi, s(time*0.52)*pi)
-    const newPos = camAnim.lerp(meshPos, sinN(time*.28)*0.5);
+    let newPos = camAnim.lerp(meshPos, sinN(time*.28)*0.5);
 
-    // pCam.position.set(newPos.x, newPos.y, newPos.z);
-    // pCam.lookAt(new THREE.Vector3(0, 0, 0));
+    let camPos = new THREE.Vector3().lerpVectors(initalCamPos, newPos, oscV.camMove.v);
+    pCam.position.set(camPos.x, camPos.y, camPos.z);
+    pCam.lookAt(new THREE.Vector3(0, 0, 0));
 
     eyeball_1.lookAt(pCam.position);
     eyeball_1.rotateY(eyePos.eyeRotation * Math.PI);
