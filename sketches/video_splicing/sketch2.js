@@ -221,7 +221,11 @@ function createFeedbackScene(){
         time :      { value: 0},
         eyePos1:    { value: new THREE.Vector2()},
         eyePos2:    { value: new THREE.Vector2()},
-        setColorRing: {value : false}
+        setColorRing: {value : false},
+        param1:     { value: 0.5},
+        param2:     { value: 0.5},
+        fdbkAmount:   { value: 0},
+        fdbkStyle:   { value: 0 }
     } 
 
     let feedbackMaterial = new THREE.ShaderMaterial({
@@ -324,14 +328,18 @@ function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
 
 function setFeedbackDisplacementUniforms(){
     feedbackDisplacementUniforms.time.value = time;
-    feedbackDisplacementUniforms.param1.value = oscV.fdbk_dsp1.v;
-    feedbackDisplacementUniforms.param2.value = oscV.fdbk_dsp2.v;
 }
 
 function setFeedbackUniforms() {
     feedbackUniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
     feedbackUniforms.time.value = time;
     feedbackUniforms.setColorRing.value = setColorRing;
+
+    feedbackUniforms.param1.value = oscV.fdbk_dsp1.v;
+    feedbackUniforms.param2.value = oscV.fdbk_dsp2.v;
+
+    feedbackUniforms.fdbkAmount.value = oscV.fdbkAmount.v;
+    feedbackUniforms.fdbkStyle.value = oscV.fdbkStyle.v;
     
     pCam.updateMatrixWorld();
 
@@ -485,7 +493,7 @@ vec2 xyHalves(){
 }
 
 vec2 randomSink() {
-    vec2 sink = vec2(param1, param2);
+    vec2 sink = vec2(0.5, 0.5);
     return mix(vUv, sink, 0.1);
 }
 
@@ -507,8 +515,12 @@ uniform sampler2D backbuffer;
 uniform sampler2D depth;
 uniform sampler2D displacement;
 uniform bool setColorRing;
-uniform vec3 eyePos1;
+uniform vec3 eyePos1;//eye positions are -1, 1
 uniform vec3 eyePos2;
+uniform float param1;
+uniform float param2;
+uniform float fdbkStyle;
+uniform float fdbkAmount;
 
 vec2 xySignCompose(vec4 xy){
     float x = xy.x + (-1.*xy.y);
@@ -516,28 +528,48 @@ vec2 xySignCompose(vec4 xy){
     return vec2(x, y);
 }
 
+
+vec2 sink(){
+    // return mix(vUv, vec2(param1, param2), -0.01);
+    vec2 dev = normalize(vUv - vec2(param1, param2))*0.001;
+    return vUv + dev;
+}
+
+vec2 outPush(){
+    vec2 eye1 = (eyePos1.xy + 1.)/2.; //eye positions are -1, 1
+    vec2 eye2 = (eyePos2.xy + 1.)/2.;
+    vec2 root = distance(vUv, eye1) <= distance(vUv, eye2) ? eye1 : eye2;
+    vec2 dev = normalize(root-vUv)*0.001;
+    // return mix(root, vUv, 1.01);
+    return vUv + dev;
+}
+
+vec2 displaceFunc() {
+    return mix(sink(), outPush(), fdbkStyle);
+}
+
+
 void main()	{
-    vec2 eye1 = (eyePos1.xy + 1.)/2.;
+    vec2 eye1 = (eyePos1.xy + 1.)/2.; //eye positions are -1, 1
     vec2 eye2 = (eyePos2.xy + 1.)/2.;
 
     float PI = 3.14159;
 
-    vec2 bbN = mix(vUv, coordWarp(vUv, time).xy, 0.005);
+    // vec2 bbN = mix(vUv, coordWarp(vUv, time).xy, 0.005);
+    // vec4 bb2 = texture(backbuffer, bbN);
 
-    
-    vec4 bb2 = texture(backbuffer, bbN);
     vec4 samp = texture(scene, vUv);
     vec4 dep = texture(depth, vUv);
 
-    vec4 disp4 = texture(displacement, vUv);
-    vec2 disp = xySignCompose(disp4)*0.1;
+    // vec4 disp4 = texture(displacement, vUv);
+    // vec2 disp = xySignCompose(disp4)*0.1;
+    vec2 disp = displaceFunc();
 
     vec2 hashN = (hash(vec3(vUv, time))-0.5).xy * 0.0005;
-    vec4 bb3 = texture(backbuffer, mix(vUv+hashN + disp, vec2(0.5), 0.001));
     
-    vec4 bb = texture(backbuffer, mix(vUv+hashN + disp, vec2(0.5), 0.001));
+    vec4 bb = texture(backbuffer, disp + hashN);
 
-    float decay = 0.001;
+    float decay = fdbkAmount * 0.1;
     bool draw = dep.r < 1.;
     float last_fdbk = bb.a;
     float fdbk = draw ? 1. : last_fdbk - decay;
