@@ -323,7 +323,7 @@ function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.time.value = time;
     eyeUniforms.useVidTex.value = eyePos.useVidTex;
     eyeUniforms.blinkRoll.value = eyePos.blinkRoll;
-    eyeUniforms.frameInd.value = eyePos.vidTexPos;
+    // eyeUniforms.frameInd.value = eyePos.vidTexPos;
 }
 
 function setFeedbackDisplacementUniforms(){
@@ -566,7 +566,7 @@ void main()	{
     
     vec4 bb = texture(backbuffer, disp + hashN);
 
-    float decay = fdbkAmount * 0.1;
+    float decay = pow(fdbkAmount, 5.)  * 0.1 + 0.0001;
     bool draw = dep.r < 1.;
     float last_fdbk = bb.a;
     float fdbk = draw ? 1. : last_fdbk - decay;
