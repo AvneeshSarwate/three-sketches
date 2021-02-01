@@ -26,18 +26,18 @@ let eye2rot_gest = new Gesture('rotate_2', (gTime, gPhase) => {
 oscH.setHandler('/rotate_2', ([vel]) =>  vel > 0 ? eye2rot_gest.start(vel/127 * 4) : 0 );
 
 let eye1blink_gest = new Gesture('blink_1', (gTime, gPhase) => {
-    eyeballUniforms_1.frameInd.value = lerp(132, 49, upDown(gPhase)) / 132;
+    eyeballUniforms_1.frameInd.value = gPhase;
 }, null, null, 1);
 oscH.setHandler('/blink_1', ([vel]) =>  vel > 0 ? eye1blink_gest.start(vel/127 * 4) : 0 );
 
 let eye2blink_gest = new Gesture('blink_2', (gTime, gPhase) => {
-    eyeballUniforms_2.frameInd.value = lerp(132, 49, upDown(gPhase)) / 132;
+    eyeballUniforms_2.frameInd.value = gPhase;
 }, null, null, 1);
 oscH.setHandler('/blink_2', ([vel]) =>  vel > 0 ? eye2blink_gest.start(vel/127 * 4) : 0 );
 
 
 const gui = new dat.GUI();
-let eyePos = { xEye: 0.37, yEye: 0.34, zoom: 0.33, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 98, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0, blinkRoll: 0};
+let eyePos = { xEye: 0.37, yEye: 0.34, zoom: 0.33, simplifyEye: false, vidScrub: false, vidPos: 0, vidTexPos: 0, useVidTex: true, eyeRotation: 1.5, yLook: 0, zLook: 0, rotRad: 0, rotAng: 0, blinkRoll: 0.1};
 let setColorRing = false;
 eyePos.colorBlast = () => {setColorRing = true;}
 gui.add(eyePos, 'xEye', 0, 1, 0.01);
@@ -46,7 +46,7 @@ gui.add(eyePos, 'zoom', 0, 1, 0.01);
 gui.add(eyePos, 'simplifyEye');
 gui.add(eyePos, 'vidScrub').onChange(v => v ? video.pause() : video.play());
 gui.add(eyePos, 'vidPos', 0, 1, 0.001).onChange(v => {video.currentTime = video.duration * v});
-gui.add(eyePos, 'vidTexPos', 0, 133);
+gui.add(eyePos, 'vidTexPos', 0, 1, 0.001);
 gui.add(eyePos, 'useVidTex');
 gui.add(eyePos, 'eyeRotation', 0, 2, .001);
 gui.add(eyePos, 'yLook', -1, 1, .001);
@@ -54,7 +54,7 @@ gui.add(eyePos, 'zLook', -1, 1, .001);
 gui.add(eyePos, 'rotRad', 0, 1, .001);
 gui.add(eyePos, 'rotAng', 0, 2*Math.PI, .001);
 gui.add(eyePos, 'colorBlast');
-gui.add(eyePos, 'blinkRoll', 0, 6.282, 0.01);
+gui.add(eyePos, 'blinkRoll', 0, 1, 0.01);
 
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
@@ -323,7 +323,7 @@ function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.time.value = time;
     eyeUniforms.useVidTex.value = eyePos.useVidTex;
     eyeUniforms.blinkRoll.value = eyePos.blinkRoll;
-    // eyeUniforms.frameInd.value = eyePos.vidTexPos;
+    eyeUniforms.frameInd.value = eyePos.vidTexPos;
 }
 
 function setFeedbackDisplacementUniforms(){
@@ -451,17 +451,14 @@ float blinkRange(float a){
 
 void main()	{
     vec2 uv = mix(vUv, eyePos.xy, eyePos.z);
-    // float dir = vUv.y < 0.5 ? -1. : 1.;
-    // uv.y = mod(time * dir + vUv.y, 1.);
-    // uv.x = mod(time * dir + vUv.x, 1.);
-    // uv = mix(uv, vec2(0.5), 0.3+sinN(time*0.3)*0.5);
-    // float quantDev = pow(sinN(time*0.32), 3.)*300.;
+    float vidPos = blinkRange(clamp(frameInd*(1.+blinkRoll) - vUv.x*blinkRoll, 0., 1.));
+
     vec4 samp = texture(passthru, uv);
-    vec4 sampTex = texture(vidFrames, vec3(flipY(uv), frameInd*0. + blinkRange(sinN(time+vUv.x*blinkRoll))));
+    vec4 sampTex = texture(vidFrames, vec3(flipY(uv), vidPos));
     if(useVidTex) samp = sampTex;
     float edgeW = 0.001;
-    vec4 rightEdge = texture(vidFrames, vec3(1.-edgeW, 1.-uv.y, frameInd));
-    vec4 leftEdge = texture(vidFrames, vec3(edgeW, 1.-uv.y, frameInd));
+    vec4 rightEdge = texture(vidFrames, vec3(1.-edgeW, 1.-uv.y, vidPos));
+    vec4 leftEdge = texture(vidFrames, vec3(edgeW, 1.-uv.y, vidPos));
     vec4 seamColor = mix(leftEdge, rightEdge, 0.5);
     float blendDist = 0.05;
     vec4 blendVal = mix(seamColor, samp, clamp(vUv.x, 0., blendDist)/blendDist);
