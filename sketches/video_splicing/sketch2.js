@@ -213,11 +213,14 @@ function createFeedbackDisplacementScene() {
 function createFeedbackScene(){
     let plane = new THREE.PlaneBufferGeometry(2, 2);
 
+    const rabbitTex = new THREE.TextureLoader().load( "/media_assets/traprabbit.jpg" );
+
     feedbackUniforms = {
         backbuffer: { value: feedbackTargets[0].texture},
         scene:      { value: videoPlacementTarget.texture},
         depth:      { value: videoPlacementTarget.depthTexture},
         displacement: {value: feedbackDisplacementTarget.texture},
+        rabbit:     { value: rabbitTex},
         time :      { value: 0},
         eyePos1:    { value: new THREE.Vector2()},
         eyePos2:    { value: new THREE.Vector2()},
@@ -225,7 +228,8 @@ function createFeedbackScene(){
         param1:     { value: 0.5},
         param2:     { value: 0.5},
         fdbkAmount:   { value: 0},
-        fdbkStyle:   { value: 0 }
+        fdbkStyle:   { value: 0 },
+        colorSpin:  {value: 0}
     } 
 
     let feedbackMaterial = new THREE.ShaderMaterial({
@@ -340,6 +344,7 @@ function setFeedbackUniforms() {
 
     feedbackUniforms.fdbkAmount.value = oscV.fdbkAmount.v;
     feedbackUniforms.fdbkStyle.value = oscV.fdbkStyle.v;
+    feedbackUniforms.colorSpin.value = oscV.colorSpin.v
     
     pCam.updateMatrixWorld();
 
@@ -511,6 +516,7 @@ uniform sampler2D scene;
 uniform sampler2D backbuffer;
 uniform sampler2D depth;
 uniform sampler2D displacement;
+uniform sampler2D rabbit;
 uniform bool setColorRing;
 uniform vec3 eyePos1;//eye positions are -1, 1
 uniform vec3 eyePos2;
@@ -518,6 +524,7 @@ uniform float param1;
 uniform float param2;
 uniform float fdbkStyle;
 uniform float fdbkAmount;
+uniform float colorSpin;
 
 vec2 xySignCompose(vec4 xy){
     float x = xy.x + (-1.*xy.y);
@@ -529,7 +536,7 @@ vec2 xySignCompose(vec4 xy){
 vec2 sink(){
     // return mix(vUv, vec2(param1, param2), -0.01);
     vec2 dev = normalize(vUv - vec2(param1, param2))*0.001;
-    return vUv + dev;
+    return dev;
 }
 
 vec2 outPush(){
@@ -538,11 +545,12 @@ vec2 outPush(){
     vec2 root = distance(vUv, eye1) <= distance(vUv, eye2) ? eye1 : eye2;
     vec2 dev = normalize(root-vUv)*0.001;
     // return mix(root, vUv, 1.01);
-    return vUv + dev;
+    return dev;
 }
 
 vec2 displaceFunc() {
-    return mix(sink(), outPush(), fdbkStyle);
+    vec2 rabbitDev = rotate(vec2(1.), vec2(0.), texture(rabbit, vUv).r*PI);
+    return vUv + mix(sink(), outPush(), fdbkStyle);
 }
 
 
@@ -583,6 +591,10 @@ void main()	{
     float eyeRad = 0.2;
     bool inEyeBorder = abs(eyeDist1 - eyeRad) < .03 || abs(eyeDist2 - eyeRad) < .03;
     if(inEyeBorder && !draw && setColorRing) col = red;
+
+    if(colorSpin != 0.) {
+        col = mod(col+pow(colorSpin, 2.)*0.01, vec3(1.));
+    }
 
     gl_FragColor = vec4(col, fdbk);
 }
