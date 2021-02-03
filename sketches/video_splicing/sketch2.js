@@ -227,9 +227,11 @@ function createFeedbackScene(){
         setColorRing: {value : false},
         param1:     { value: 0.5},
         param2:     { value: 0.5},
-        fdbkAmount:   { value: 0},
-        fdbkStyle:   { value: 0 },
-        colorSpin:  {value: 0}
+        fdbkAmount: { value: 0},
+        fdbkStyle:  { value: 0 },
+        colorSpin:  { value: 0},
+        devSpeed:   { value: 0},
+        blurWidth:  { value: 0}
     } 
 
     let feedbackMaterial = new THREE.ShaderMaterial({
@@ -345,6 +347,8 @@ function setFeedbackUniforms() {
     feedbackUniforms.fdbkAmount.value = oscV.fdbkAmount.v;
     feedbackUniforms.fdbkStyle.value = oscV.fdbkStyle.v;
     feedbackUniforms.colorSpin.value = oscV.colorSpin.v
+    feedbackUniforms.devSpeed.value = oscV.devSpeed.v;
+    feedbackUniforms.blurWidth.value = oscV.blurWidth.v;
     
     pCam.updateMatrixWorld();
 
@@ -525,6 +529,8 @@ uniform float param2;
 uniform float fdbkStyle;
 uniform float fdbkAmount;
 uniform float colorSpin;
+uniform float devSpeed;
+uniform float blurWidth;
 
 vec2 xySignCompose(vec4 xy){
     float x = xy.x + (-1.*xy.y);
@@ -550,7 +556,7 @@ vec2 outPush(){
 
 vec2 displaceFunc() {
     vec2 rabbitDev = rotate(vec2(1.), vec2(0.), texture(rabbit, vUv).r*PI);
-    return vUv + mix(sink(), outPush(), fdbkStyle);
+    return vUv + mix(sink(), outPush(), fdbkStyle) * devSpeed * 5.;
 }
 
 
@@ -570,7 +576,7 @@ void main()	{
     // vec2 disp = xySignCompose(disp4)*0.1;
     vec2 disp = displaceFunc();
 
-    vec2 hashN = (hash(vec3(vUv, time))-0.5).xy * 0.0005;
+    vec2 hashN = (hash(vec3(vUv, time))-0.5).xy * 0.0005 * blurWidth * 5.;
     
     vec4 bb = texture(backbuffer, disp + hashN);
 
@@ -593,7 +599,7 @@ void main()	{
     if(inEyeBorder && !draw && setColorRing) col = red;
 
     if(colorSpin != 0.) {
-        col = mod(col+pow(colorSpin, 2.)*0.01, vec3(1.));
+        col = mod(col+pow(colorSpin, 1.)*0.005, vec3(1.));
     }
 
     gl_FragColor = vec4(col, fdbk);
