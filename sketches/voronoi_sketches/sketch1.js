@@ -49,13 +49,16 @@ function createVoronoiScene() {
 
 function updateVoronoiScene(time) {
     let vsc = voronoiSceneComponents;
-    vsc.sites = numSites.map(i => timeNoise2d(51.32, 21.32, time-i));
+    vsc.sites.forEach((s, i) => Object.assign(s,  timeNoise2d(51.32, 21.32, time-i)))
 
     voronoi.recycle(diagram);
     diagram = recomputeVoronoi();
 
-    numSites.map(i => {
-        updateGeometryFromVoronoiCell(diagram.cells[i], vsc.geometries[i]);
+    /* Important - cell order does not reflect input site order - the the voronoiID, 
+       which the voronoi library adds onto the site objects,
+       maps the site => its corresponding cell */
+    vsc.sites.forEach((site, i) => {
+        updateGeometryFromVoronoiCell(diagram.cells[site.voronoiId], vsc.geometries[i]); 
     });
 }
 
@@ -104,7 +107,7 @@ function timeNoise2d(xRand, yRand, time){
 function animate() {
     requestAnimationFrame(animate);
 
-    time = Date.now() / 1000 * 0.2;
+    time = Date.now() / 1000 * 0.08;
    
     updateVoronoiScene(time);
 
