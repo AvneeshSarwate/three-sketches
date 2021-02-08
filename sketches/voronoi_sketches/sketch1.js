@@ -21,7 +21,14 @@ let voronoiSceneComponents = {
     geometries: [],
     materials: [],
     uniforms: {},
-    meshes:  []
+    meshes:  [],
+    buffers: [
+        {
+           cellPts:[],
+           uvPts: [],
+           cell3d: [] 
+        }
+    ]
 };
 
 let cam, time, renderer, stats, diagram;
@@ -35,14 +42,21 @@ function createVoronoiScene() {
     vsc.sites = numSites.map(i => timeNoise2d(51.32, 21.32, 0-i));
     vsc.geometries = numSites.map(() => new THREE.BufferGeometry());
     vsc.materials = numSites.map(() => new THREE.MeshBasicMaterial({color: randColor()}));
-    vsc.meshes = numSites.map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]))
+    vsc.meshes = numSites.map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]));
+    vsc.buffers = numSites.map(i => {
+        return {
+            cellPts: new Float32Array(200),
+            uvPts: new Float32Array(200),
+            cell3d: new Float32Array(300)
+        }
+    })
 
     diagram = recomputeVoronoi();
 
     vsc.scene = new THREE.Scene();
 
     numSites.forEach(i => {
-        updateGeometryFromVoronoiCell(diagram.cells[i], vsc.geometries[i]);
+        updateGeometryFromVoronoiCell(diagram.cells[i], vsc.geometries[i], i, true);
         vsc.scene.add(vsc.meshes[i]);
     });
 }
@@ -58,19 +72,27 @@ function updateVoronoiScene(time) {
        which the voronoi library adds onto the site objects,
        maps the site => its corresponding cell */
     vsc.sites.forEach((site, i) => {
-        updateGeometryFromVoronoiCell(diagram.cells[site.voronoiId], vsc.geometries[i]); 
+        updateGeometryFromVoronoiCell(diagram.cells[site.voronoiId], vsc.geometries[i], i); 
     });
 }
 
-function updateGeometryFromVoronoiCell(cell, bufferGeom) {
-    let cellPts = getCellPoints(cell);
+function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=false) {
+    let vsc = voronoiSceneComponents;
+    let cellPts = getCellPoints(cell, vsc.buffers[ind].cellPts);
     let triangulatedPts = Earcut.triangulate(cellPts.flat());
-    let uvPts = Float32Array.from(cellPts.map(([x, y]) => [(x+1)/2, (y+1)/2]).flat());
-    let cell3d = Float32Array.from(cellPts.map(([x, y]) => [x, y, 0]).flat());
+    let uvPts = cellPts.map(([x, y]) => [(x+1)/2, (y+1)/2]).flat();
+    let cell3d = cellPts.map(([x, y]) => [x, y, 0]).flat();
 
     bufferGeom.setIndex(triangulatedPts);
-    bufferGeom.setAttribute('position', new THREE.BufferAttribute(cell3d, 3));
-    bufferGeom.setAttribute('uv', new THREE.BufferAttribute(uvPts, 2));
+    if(initialCreation) {
+        bufferGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(300), 3));
+        bufferGeom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(200), 2));
+    } else {
+        bufferGeom.getAttribute('position').set(cell3d);
+        bufferGeom.getAttribute('uv').set(uvPts);
+        bufferGeom.attributes.position.needsUpdate = true;
+        bufferGeom.attributes.uv.needsUpdate = true;
+    }
 }
 
 function init() {
@@ -107,11 +129,11 @@ function timeNoise2d(xRand, yRand, time){
 function animate() {
     requestAnimationFrame(animate);
 
+    renderer.render(voronoiSceneComponents.scene, cam);
+
     time = Date.now() / 1000 * 0.08;
    
     updateVoronoiScene(time);
-
-    renderer.render(voronoiSceneComponents.scene, cam);
 
     stats.update();
 }
