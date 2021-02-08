@@ -13,8 +13,8 @@ function range(size, startAt = 0) {
 let randColor = () =>  '#'+Math.floor(Math.random()*16777215).toString(16);
 
 let simplex = new SimplexNoise();
-let numSites = range(10);
-let voronoi = new Voronoi();
+let numSites = 64;
+let voronoi = new Voronoi(); 
 let voronoiSceneComponents = {
     sites: [],
     scene: {},
