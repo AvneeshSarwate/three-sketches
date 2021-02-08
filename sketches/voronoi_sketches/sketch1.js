@@ -66,7 +66,7 @@ function updateVoronoiScene(time) {
     let vsc = voronoiSceneComponents;
     let pointFunc = i =>  timeNoise2d(51.32, 21.32, time-i);
     let pointFunc2 = i => ({x: Math.cos(time-i), y: Math.sin(time-i)});
-    vsc.sites.forEach((s, i) => Object.assign(s, pointFunc(i) ))
+    vsc.sites.forEach((s, i) => Object.assign(s, pointFunc2(i) ))
     // Object.assign(vsc.sites[0], {x: 0, y: 0});
 
     voronoi.recycle(diagram);
@@ -90,16 +90,41 @@ function simpleConvexTriangulation(numSides) {
     return vertexInds;
 }
 
+let mod = (v, n) => ((v%n)+n)%n;
+
+function convexTri2(numSides) {
+    let numTri = numSides-2;
+    let startInd = 1;
+    let skipSize = 1;
+    let vertices = [];
+    for(let i = 0; i < numTri; i++) {
+        let pts = [startInd, mod(startInd-skipSize, numSides), mod(startInd-skipSize*2, numSides)];
+        if(pts[1] == 0 && i != 0) {
+            skipSize *= 2;
+            pts = [startInd, mod(startInd-skipSize, numSides), mod(startInd-skipSize*2, numSides)]
+        } else if(pts[2] == 0 && i != 0) {
+            pts = [startInd, mod(startInd-skipSize, numSides), mod(startInd-skipSize*3, numSides)]
+            skipSize *= 2;
+        }
+        vertices.push(...pts);
+        startInd = pts[2];
+    }
+
+    return vertices;
+}
+
 function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=false) {
     let vsc = voronoiSceneComponents;
     let cellBuffers = vsc.buffers[ind];
     let cellPts = getCellPoints(cell, cellBuffers.cellPts, true);
 
     let circle = n => range(n).map(i => [Math.cos(-i/n*2*Math.PI), Math.sin(-i/n*2*Math.PI)]).flat()
-    let triangulatedPts = Earcut.triangulate(cellPts.flat());
-    let triangulatedPts2 = simpleConvexTriangulation(cell.halfedges.length);
-    if(cell.halfedges.length > 5) {
-        let fsfs = 5;
+    // let triangulatedPts = Earcut.triangulate(cellPts.flat());
+    let triangulatedPts2 = convexTri2(cell.halfedges.length);
+    if(cell.halfedges.length > 8) {
+        let arrayComp = (a1, a2) => a1.map((v, i) => v == a2[i]).reduce((a, b) => a && b);
+        let test = n => arrayComp(convexTri2(n), Earcut.triangulate(circle(n)))
+        let fsfs = convexTri2(5);
     }
 
     for(let i = 0; i < cell.halfedges.length; i++) {
