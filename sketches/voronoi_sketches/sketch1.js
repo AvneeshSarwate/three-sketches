@@ -39,15 +39,16 @@ function recomputeVoronoi() {
 
 function createVoronoiScene() {
     let vsc = voronoiSceneComponents;
-    vsc.sites = numSites.map(i => timeNoise2d(51.32, 21.32, 0-i));
-    vsc.geometries = numSites.map(() => new THREE.BufferGeometry());
-    vsc.materials = numSites.map(() => new THREE.MeshBasicMaterial({color: randColor()}));
-    vsc.meshes = numSites.map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]));
-    vsc.buffers = numSites.map(i => {
+    vsc.sites = range(numSites).map(i => timeNoise2d(51.32, 21.32, 0-i));
+    vsc.geometries = range(numSites).map(() => new THREE.BufferGeometry());
+    vsc.materials = range(numSites).map(() => new THREE.MeshBasicMaterial({color: randColor()}));
+    vsc.meshes = range(numSites).map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]));
+
+    vsc.buffers = range(numSites).map(i => {
         return {
-            cellPts: new Float32Array(200),
-            uvPts: new Float32Array(200),
-            cell3d: new Float32Array(300)
+            cellPts: new Float32Array(numSites * 2),
+            uvPts: new Float32Array(numSites * 2),
+            cell3d: new Float32Array(numSites * 3)
         }
     })
 
@@ -55,7 +56,7 @@ function createVoronoiScene() {
 
     vsc.scene = new THREE.Scene();
 
-    numSites.forEach(i => {
+    range(numSites).forEach(i => {
         updateGeometryFromVoronoiCell(diagram.cells[i], vsc.geometries[i], i, true);
         vsc.scene.add(vsc.meshes[i]);
     });
@@ -63,7 +64,10 @@ function createVoronoiScene() {
 
 function updateVoronoiScene(time) {
     let vsc = voronoiSceneComponents;
-    vsc.sites.forEach((s, i) => Object.assign(s,  timeNoise2d(51.32, 21.32, time-i)))
+    let pointFunc = i =>  timeNoise2d(51.32, 21.32, time-i);
+    let pointFunc2 = i => ({x: Math.cos(time-i), y: Math.sin(time-i)});
+    vsc.sites.forEach((s, i) => Object.assign(s, pointFunc(i) ))
+    // Object.assign(vsc.sites[0], {x: 0, y: 0});
 
     voronoi.recycle(diagram);
     diagram = recomputeVoronoi();
@@ -76,9 +80,52 @@ function updateVoronoiScene(time) {
     });
 }
 
+function simpleConvexTriangulation(numSides) {
+    let vertexInds = [];
+    for(let i = 0; i < numSides-2; i++) {
+        vertexInds.push(0);
+        vertexInds.push(i+1);
+        vertexInds.push(i+2);
+    }
+    return vertexInds;
+}
+
 function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=false) {
     let vsc = voronoiSceneComponents;
-    let cellPts = getCellPoints(cell, vsc.buffers[ind].cellPts);
+    let cellBuffers = vsc.buffers[ind];
+    let cellPts = getCellPoints(cell, cellBuffers.cellPts, true);
+
+    let circle = n => range(n).map(i => [Math.cos(-i/n*2*Math.PI), Math.sin(-i/n*2*Math.PI)]).flat()
+    let triangulatedPts = Earcut.triangulate(cellPts.flat());
+    let triangulatedPts2 = simpleConvexTriangulation(cell.halfedges.length);
+    if(cell.halfedges.length > 5) {
+        let fsfs = 5;
+    }
+
+    for(let i = 0; i < cell.halfedges.length; i++) {
+        cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[i*2]   + 1)/2;
+        cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[i*2+1] +1 )/2
+
+        cellBuffers.cell3d[i*3]   = cellBuffers.cellPts[i*2];
+        cellBuffers.cell3d[i*3+1] = cellBuffers.cellPts[i*2+1];
+        cellBuffers.cell3d[i*3+2] = 0;
+    }
+
+    bufferGeom.setIndex(triangulatedPts2);
+    if(initialCreation) {
+        bufferGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(numSites * 3), 3));
+        bufferGeom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(numSites * 2), 2));
+    } else {
+        bufferGeom.getAttribute('position').set(cellBuffers.cell3d);
+        bufferGeom.getAttribute('uv').set(cellBuffers.uvPts);
+        bufferGeom.attributes.position.needsUpdate = true;
+        bufferGeom.attributes.uv.needsUpdate = true;
+    }
+}
+
+function updateGeometryFromVoronoiCell_old(cell, bufferGeom, ind, initialCreation=false) {
+    let vsc = voronoiSceneComponents;
+    let cellPts = getCellPoints(cell, vsc.buffers[ind].cellPts, true);
     let triangulatedPts = Earcut.triangulate(cellPts.flat());
     let uvPts = cellPts.map(([x, y]) => [(x+1)/2, (y+1)/2]).flat();
     let cell3d = cellPts.map(([x, y]) => [x, y, 0]).flat();
