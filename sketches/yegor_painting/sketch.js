@@ -99,7 +99,7 @@ function animate() {
     time = performance.now() / 1000 - startTime;
 
     uniforms.time.value = time;
-    uniforms2.time.value = time;
+    // uniforms2.time.value = time;
 
     renderer.render(scene, camera);
     stats.update();

@@ -30,6 +30,7 @@ let voronoiSceneComponents = {
         }
     ]
 };
+let positionAttribute, uvAttribute;
 
 let cam, time, renderer, stats, diagram;
 
@@ -48,6 +49,8 @@ function createVoronoiScene() {
         return mat
     });
     vsc.meshes = range(numSites).map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]));
+    positionAttribute = new THREE.BufferAttribute(new Float32Array(numSites*numSites * 3), 3);
+    uvAttribute = new THREE.BufferAttribute(new Float32Array(numSites*numSites * 2), 2);
 
     vsc.buffers = range(numSites).map(i => {
         return {
@@ -83,6 +86,9 @@ function updateVoronoiScene(time) {
     vsc.sites.forEach((site, i) => {
         updateGeometryFromVoronoiCell(diagram.cells[site.voronoiId], vsc.geometries[i], i); 
     });
+
+    positionAttribute.needsUpdate = true;
+    uvAttribute.needsUpdate = true;
 }
 
 function simpleConvexTriangulation(numSides) {
@@ -141,15 +147,13 @@ function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=fa
         cellBuffers.cell3d[i*3+2] = 0;
     }
 
-    bufferGeom.setIndex(triangulatedPts2);
+    bufferGeom.setIndex(triangulatedPts2.map(i => i + ind*numSites));
     if(initialCreation) {
-        bufferGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(numSites * 3), 3));
-        bufferGeom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(numSites * 2), 2));
+        bufferGeom.setAttribute('position', positionAttribute);
+        bufferGeom.setAttribute('uv', uvAttribute);
     } else {
-        bufferGeom.getAttribute('position').set(cellBuffers.cell3d);
-        bufferGeom.getAttribute('uv').set(cellBuffers.uvPts);
-        bufferGeom.attributes.position.needsUpdate = true;
-        bufferGeom.attributes.uv.needsUpdate = true;
+        positionAttribute.set(cellBuffers.cell3d, ind*numSites*3);
+        uvAttribute.set(cellBuffers.uvPts, ind*numSites*2);
     }
 }
 
