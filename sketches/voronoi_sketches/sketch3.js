@@ -13,8 +13,8 @@ function range(size, startAt = 0) {
 let randColor = () =>  '#'+Math.floor(Math.random()*16777215).toString(16);
 
 let simplex = new SimplexNoise();
-let numSites = range(10);
-let voronoi = new Voronoi();
+let numSites = 64;
+let voronoi = new Voronoi(); 
 let voronoiSceneComponents = {
     sites: [],
     scene: {},
@@ -32,16 +32,16 @@ function recomputeVoronoi() {
 
 function createVoronoiScene() {
     let vsc = voronoiSceneComponents;
-    vsc.sites = numSites.map(i => timeNoise2d(51.32, 21.32, 0-i));
-    vsc.geometries = numSites.map(() => new THREE.BufferGeometry());
-    vsc.materials = numSites.map(() => new THREE.MeshBasicMaterial({color: randColor()}));
-    vsc.meshes = numSites.map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]))
+    vsc.sites = range(numSites).map(i => timeNoise2d(51.32, 21.32, 0-i));
+    vsc.geometries = range(numSites).map(() => new THREE.BufferGeometry());
+    vsc.materials = range(numSites).map(() => new THREE.MeshBasicMaterial({color: randColor()}));
+    vsc.meshes = range(numSites).map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]))
 
     diagram = recomputeVoronoi();
 
     vsc.scene = new THREE.Scene();
 
-    numSites.forEach(i => {
+    range(numSites).forEach(i => {
         updateGeometryFromVoronoiCell(diagram.cells[i], vsc.geometries[i]);
         vsc.scene.add(vsc.meshes[i]);
     });
@@ -63,7 +63,7 @@ function updateVoronoiScene(time) {
 }
 
 function updateGeometryFromVoronoiCell(cell, bufferGeom) {
-    let cellPts = getCellPoints(cell);
+    let cellPts = getCellPoints(cell, [], true);
     let triangulatedPts = Earcut.triangulate(cellPts.flat());
     let uvPts = Float32Array.from(cellPts.map(([x, y]) => [(x+1)/2, (y+1)/2]).flat());
     let cell3d = Float32Array.from(cellPts.map(([x, y]) => [x, y, 0]).flat());

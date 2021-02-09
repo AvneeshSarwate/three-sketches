@@ -146,8 +146,8 @@ function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=fa
         bufferGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(numSites * 3), 3));
         bufferGeom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(numSites * 2), 2));
     } else {
-        bufferGeom.getAttribute('position').set(cellBuffers.cell3d);
-        bufferGeom.getAttribute('uv').set(cellBuffers.uvPts);
+        bufferGeom.getAttribute('position').copyArray(cellBuffers.cell3d);
+        bufferGeom.getAttribute('uv').copyArray(cellBuffers.uvPts);
         bufferGeom.attributes.position.needsUpdate = true;
         bufferGeom.attributes.uv.needsUpdate = true;
     }
