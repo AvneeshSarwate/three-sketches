@@ -41,7 +41,12 @@ function createVoronoiScene() {
     let vsc = voronoiSceneComponents;
     vsc.sites = range(numSites).map(i => timeNoise2d(51.32, 21.32, 0-i));
     vsc.geometries = range(numSites).map(() => new THREE.BufferGeometry());
-    vsc.materials = range(numSites).map(() => new THREE.MeshBasicMaterial({color: randColor()}));
+    let baseMaterial = new THREE.MeshBasicMaterial({color: randColor()})
+    vsc.materials = range(numSites).map(() => {
+        let mat = baseMaterial.clone();
+        mat.color = new THREE.Color(Math.random(), Math.random(), Math.random());
+        return mat
+    });
     vsc.meshes = range(numSites).map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]));
 
     vsc.buffers = range(numSites).map(i => {
