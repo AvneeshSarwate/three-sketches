@@ -4,7 +4,9 @@ import * as THREE from "../../node_modules/three/build/three.module.js";
 import { getCellPoints } from "../../utilities/voronoi_manager.js";
 import { Earcut } from "../../node_modules/three/src/extras/Earcut.js";
 import Stats from "../../node_modules/three/examples/jsm/libs/stats.module.js";
-
+//template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
+//backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
+const glsl = a => a[0];
 
 function range(size, startAt = 0) {
     return [...Array(size).keys()].map(i => i + startAt);
@@ -13,7 +15,7 @@ function range(size, startAt = 0) {
 let randColor = () =>  '#'+Math.floor(Math.random()*16777215).toString(16);
 
 let simplex = new SimplexNoise();
-let numSites = 64;
+let numSites = 5**2;
 let voronoi = new Voronoi(); 
 let voronoiSceneComponents = {
     sites: [],
@@ -41,10 +43,12 @@ function createVoronoiScene() {
     let vsc = voronoiSceneComponents;
     vsc.sites = range(numSites).map(i => timeNoise2d(51.32, 21.32, 0-i));
     vsc.geometries = range(numSites).map(() => new THREE.BufferGeometry());
-    let baseMaterial = new THREE.MeshBasicMaterial({color: randColor()})
+    let baseMaterial = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: uvShader
+    })
     vsc.materials = range(numSites).map(() => {
         let mat = baseMaterial.clone();
-        mat.color = new THREE.Color(Math.random(), Math.random(), Math.random());
         return mat
     });
     vsc.meshes = range(numSites).map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]));
@@ -67,15 +71,36 @@ function createVoronoiScene() {
     });
 }
 
+let vec2 = (x,y) => new THREE.Vector2(x, y);
+let sinN = n => (Math.sin(n)+1)/2;
+let lerp1 = (n1, n2, a) => n1*(1-a) + a*n2;
+
+let pf = i =>  timeNoise2d(51.32, 21.32, time*2-i*0.07);
+let pf2 = i => vec2(Math.cos(time-i),  Math.sin(time-i));
+let pf3 = i => {
+    let rowSize = numSites**0.5;
+    let row = Math.floor(i/rowSize) / rowSize + (0.5 / rowSize);
+    let col = (i % rowSize) / rowSize + (0.5 / rowSize);
+    return vec2(lerp1(-1,1,col), lerp1(-1,1,row))
+}
+let pf4 = i => {
+    let rad = i%2 == 0 ? 1 : 0.5;
+    return vec2(Math.cos(time-i)*rad,  Math.sin(time-i)*rad)
+}
+
 function updateVoronoiScene(time) {
     let vsc = voronoiSceneComponents;
-    let pointFunc = i =>  timeNoise2d(51.32, 21.32, time-i);
-    let pointFunc2 = i => ({x: Math.cos(time-i), y: Math.sin(time-i)});
-    vsc.sites.forEach((s, i) => Object.assign(s, pointFunc2(i) ))
+    vsc.sites.forEach((s, i) => Object.assign( s, pf3(i).lerp( pf4(i).lerp(pf(i), sinN(time*6,28)), 0.2) ))
     // Object.assign(vsc.sites[0], {x: 0, y: 0});
-
-    voronoi.recycle(diagram);
-    diagram = recomputeVoronoi();
+    
+    try {
+        voronoi.recycle(diagram);
+        diagram = recomputeVoronoi();
+    } catch {
+        voronoi = new Voronoi();
+        diagram = null;
+        return
+    }
 
     /* Important - cell order does not reflect input site order - the the voronoiID, 
        which the voronoi library adds onto the site objects,
@@ -85,62 +110,15 @@ function updateVoronoiScene(time) {
     });
 }
 
-function simpleConvexTriangulation(numSides) {
-    let vertexInds = [];
-    for(let i = 0; i < numSides-2; i++) {
-        vertexInds.push(0);
-        vertexInds.push(i+1);
-        vertexInds.push(i+2);
-    }
-    return vertexInds;
-}
 
 let mod = (v, n) => ((v%n)+n)%n;
-
-function convexTri2(numSides) {
-    let numTri = numSides-2;
-    let startInd = 1;
-    let skipSize = 1;
-    let vertices = [];
-    for(let i = 0; i < numTri; i++) {
-        let pts = [startInd, mod(startInd-skipSize, numSides), mod(startInd-skipSize*2, numSides)];
-        if(pts[1] == 0 && i != 0) {
-            skipSize *= 2;
-            pts = [startInd, mod(startInd-skipSize, numSides), mod(startInd-skipSize*2, numSides)]
-        } else if(pts[2] == 0 && i != 0) {
-            pts = [startInd, mod(startInd-skipSize, numSides), mod(startInd-skipSize*3, numSides)]
-            skipSize *= 2;
-        }
-        vertices.push(...pts);
-        startInd = pts[2];
-    }
-
-    return vertices;
-}
 
 function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=false) {
     let vsc = voronoiSceneComponents;
     let cellBuffers = vsc.buffers[ind];
     let cellPts = getCellPoints(cell, cellBuffers.cellPts, true);
 
-    let circle = n => range(n).map(i => [Math.cos(-i/n*2*Math.PI), Math.sin(-i/n*2*Math.PI)]).flat()
     let triangulatedPts = Earcut.triangulate(cellPts.flat());
-    // let triangulatedPts2 = convexTri2(cell.halfedges.length);
-    if(cell.halfedges.length > 8) {
-        let arrayComp = (a1, a2) => a1.map((v, i) => v == a2[i]).reduce((a, b) => a && b);
-        let test = n => arrayComp(convexTri2(n), Earcut.triangulate(circle(n)))
-        let fsfs = convexTri2(5);
-    }
-
-    // for(let i = 0; i < cell.halfedges.length; i++) {
-    //     cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[i*2]   + 1)/2;
-    //     cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[i*2+1] +1 )/2
-
-    //     cellBuffers.cell3d[i*3]   = cellBuffers.cellPts[i*2];
-    //     cellBuffers.cell3d[i*3+1] = cellBuffers.cellPts[i*2+1];
-    //     cellBuffers.cell3d[i*3+2] = 0;
-    // }
-    // bufferGeom.setIndex(triangulatedPts2);
 
     triangulatedPts.forEach((ind, i) => {
         cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[ind*2]   + 1)/2;
@@ -191,7 +169,7 @@ function onWindowResize() {
 }
 
 function timeNoise2d(xRand, yRand, time){
-    return {x: simplex.noise(xRand, time), y: simplex.noise(yRand, time)};
+    return  vec2(simplex.noise(xRand, time),  simplex.noise(yRand, time));
 }
 
 function animate() {
@@ -210,3 +188,23 @@ export {
     init,
     animate
 }
+
+
+let vertexShader = glsl`
+varying vec2 vUv;
+
+void main()	{
+
+  vUv = uv;
+
+  vec3 p = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+}`;
+
+let uvShader = glsl`
+varying vec2 vUv;
+
+void main()	{
+    gl_FragColor = vec4(vUv, 0., 1.);
+}`;
