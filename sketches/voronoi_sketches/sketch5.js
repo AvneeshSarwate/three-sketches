@@ -4,6 +4,7 @@ import * as THREE from "../../node_modules/three/build/three.module.js";
 import { getCellPoints } from "../../utilities/voronoi_manager.js";
 import { Earcut } from "../../node_modules/three/src/extras/Earcut.js";
 import Stats from "../../node_modules/three/examples/jsm/libs/stats.module.js";
+import header_code from "../../header_frag.js";
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
 const glsl = a => a[0];
@@ -45,13 +46,24 @@ function createVoronoiScene() {
     vsc.geometries = range(numSites).map(() => new THREE.BufferGeometry());
     let baseMaterial = new THREE.ShaderMaterial({
         vertexShader: vertexShader,
-        fragmentShader: uvShader
+        fragmentShader: header_code + radialShader,
+        uniforms: { 
+            time: {value: 0},
+            ind:  {value: 0}
+        }
     })
-    vsc.materials = range(numSites).map(() => {
+    vsc.materials = range(numSites).map((i) => {
         let mat = baseMaterial.clone();
+        mat.uniforms = { 
+            time: {value: Math.PI/2},
+            ind:  {value: i}
+        };
         return mat
     });
     vsc.meshes = range(numSites).map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]));
+    vsc.meshes.forEach(mesh => {
+        mesh.onBeforeRender =(renderer, scene, camera, geometry, material, group) => {material.uniforms.time.value = time/0.08*2}
+    })
 
     vsc.buffers = range(numSites).map(i => {
         return {
@@ -113,16 +125,33 @@ function updateVoronoiScene(time) {
 
 let mod = (v, n) => ((v%n)+n)%n;
 
+let getCellBBox = pts => {
+    let maxX = -Infinity, maxY = -Infinity, minX = Infinity, minY = Infinity;
+    for(let i = 0; i < pts.length; i++) {
+        let [x, y] = pts[i]
+        if(x > maxX) maxX = x;
+        if(x < minX) minX = x;
+        if(y > maxY) maxY = y;
+        if(y < minY) minY = y;
+    }
+    return {maxX, maxY, minX, minY, xRange: maxX-minX, yRange: maxY-minY};
+}
+
 function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=false) {
     let vsc = voronoiSceneComponents;
     let cellBuffers = vsc.buffers[ind];
     let cellPts = getCellPoints(cell, cellBuffers.cellPts, true);
+    let cellBBox = getCellBBox(cellPts);
 
     let triangulatedPts = Earcut.triangulate(cellPts.flat());
 
     triangulatedPts.forEach((ind, i) => {
-        cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[ind*2]   + 1)/2;
-        cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[ind*2+1] +1 )/2
+        // uv of whole quad
+        // cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[ind*2]   + 1)/2;
+        // cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[ind*2+1] +1 )/2
+
+        cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[ind*2]   - cellBBox.minX)/cellBBox.xRange;
+        cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[ind*2+1] - cellBBox.minY)/cellBBox.yRange;
     
         cellBuffers.cell3d[i*3]   = cellBuffers.cellPts[ind*2];
         cellBuffers.cell3d[i*3+1] = cellBuffers.cellPts[ind*2+1];
@@ -208,3 +237,17 @@ varying vec2 vUv;
 void main()	{
     gl_FragColor = vec4(vUv, 0., 1.);
 }`;
+
+let radialShader = glsl`
+varying vec2 vUv;
+
+uniform float time;
+uniform float ind;
+
+void main()	{
+    float t = time*3.;
+    float col = pow(1. - abs(distance(vUv, vec2(0.5)) - sinN(t)/2.)*4., 4.);
+    float col2 = pow(1. - distance(vec2(sinN(t), cosN(t)), vUv), 4.);
+    gl_FragColor = vec4(vec3(sinN(time)), 1.);
+}`;
+
