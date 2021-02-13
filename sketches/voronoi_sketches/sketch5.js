@@ -16,7 +16,8 @@ function range(size, startAt = 0) {
 let randColor = () =>  '#'+Math.floor(Math.random()*16777215).toString(16);
 
 let simplex = new SimplexNoise();
-let numSites = 5**2;
+let numSites = 4;
+let numVert = numSites + 8; //each polygon buffer will have to have enough verts to account for each other polygon and the bounding box sides
 let voronoi = new Voronoi(); 
 let voronoiSceneComponents = {
     sites: [],
@@ -61,15 +62,23 @@ function createVoronoiScene() {
         return mat
     });
     vsc.meshes = range(numSites).map(i => new THREE.Mesh(vsc.geometries[i], vsc.materials[i]));
-    vsc.meshes.forEach(mesh => {
-        mesh.onBeforeRender =(renderer, scene, camera, geometry, material, group) => {material.uniforms.time.value = time/0.08*2}
+    
+    var nth = 0;
+    vsc.meshes.forEach((mesh, i) => {
+        mesh.onBeforeRender = (renderer, scene, camera, geometry, material, group) => {
+            material.uniforms.time.value = time/0.08*2;
+            if(i == 0 && nth++%15 == 0) {
+                material.uniforms.ind.value = nth;
+                console.log(material.uniforms.time.value)
+            }
+         }
     })
 
     vsc.buffers = range(numSites).map(i => {
         return {
-            cellPts: new Float32Array(numSites * 2),
-            uvPts: new Float32Array(numSites * 2),
-            cell3d: new Float32Array(numSites * 3)
+            cellPts: new Float32Array(numVert * 2),
+            uvPts: new Float32Array(numVert * 2),
+            cell3d: new Float32Array(numVert * 3)
         }
     })
 
@@ -143,7 +152,7 @@ function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=fa
     let cellPts = getCellPoints(cell, cellBuffers.cellPts, true);
     let cellBBox = getCellBBox(cellPts);
 
-    let triangulatedPts = Earcut.triangulate(cellPts.flat());
+    let triangulatedPts = Earcut.triangulate(cellPts.flat(), [], 2);
 
     triangulatedPts.forEach((ind, i) => {
         // uv of whole quad
@@ -157,17 +166,22 @@ function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=fa
         cellBuffers.cell3d[i*3+1] = cellBuffers.cellPts[ind*2+1];
         cellBuffers.cell3d[i*3+2] = 0;
     });
+    []
     bufferGeom.setDrawRange(0, triangulatedPts.length)
 
     if(initialCreation) {
-        bufferGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(numSites * 3), 3));
-        bufferGeom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(numSites * 2), 2));
+        bufferGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(numVert * 3), 3));
+        bufferGeom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(numVert * 2), 2));
     } else {
         bufferGeom.getAttribute('position').copyArray(cellBuffers.cell3d);
         bufferGeom.getAttribute('uv').copyArray(cellBuffers.uvPts);
         bufferGeom.attributes.position.needsUpdate = true;
         bufferGeom.attributes.uv.needsUpdate = true;
     }
+}
+
+window.onkeypress = e => {
+    animate();
 }
 
 function init() {
@@ -202,7 +216,7 @@ function timeNoise2d(xRand, yRand, time){
 }
 
 function animate() {
-    requestAnimationFrame(animate);
+    // requestAnimationFrame(animate);
 
     renderer.render(voronoiSceneComponents.scene, cam);
 
@@ -248,6 +262,6 @@ void main()	{
     float t = time*3.;
     float col = pow(1. - abs(distance(vUv, vec2(0.5)) - sinN(t)/2.)*4., 4.);
     float col2 = pow(1. - distance(vec2(sinN(t), cosN(t)), vUv), 4.);
-    gl_FragColor = vec4(vec3(sinN(time)), 1.);
+    gl_FragColor = vec4(vec3(hash(vec3(ind, 4., 3.))), 1.);
 }`;
 
