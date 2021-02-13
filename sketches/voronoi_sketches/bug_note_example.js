@@ -36,6 +36,7 @@ let voronoiSceneComponents = {
 };
 
 let cam, time, renderer, stats, diagram;
+let startTime = Date.now()/1000;
 
 function recomputeVoronoi() {
     return voronoi.compute(voronoiSceneComponents.sites, {xl: -1, xr: 1, yt: -1, yb: 1}) //TODO: might need to flip y
@@ -96,22 +97,22 @@ let vec2 = (x,y) => new THREE.Vector2(x, y);
 let sinN = n => (Math.sin(n)+1)/2;
 let lerp1 = (n1, n2, a) => n1*(1-a) + a*n2;
 
-let pf = i =>  timeNoise2d(51.32, 21.32, time*2-i*0.07);
-let pf2 = i => vec2(Math.cos(time-i),  Math.sin(time-i));
-let pf3 = i => {
+let pf = (i, time) =>  timeNoise2d(51.32, 21.32, time*2-i*0.07);
+let pf2 = (i, time) => vec2(Math.cos(time-i),  Math.sin(time-i));
+let pf3 = (i, time) => {
     let rowSize = numSites**0.5;
     let row = Math.floor(i/rowSize) / rowSize + (0.5 / rowSize);
     let col = (i % rowSize) / rowSize + (0.5 / rowSize);
     return vec2(lerp1(-1,1,col), lerp1(-1,1,row))
 }
-let pf4 = i => {
+let pf4 = (i, time) => {
     let rad = i%2 == 0 ? 1 : 0.5;
     return vec2(Math.cos(time-i)*rad,  Math.sin(time-i)*rad)
 }
 
-function updateVoronoiScene(time) {
+function updateVoronoiScene(t) {
     let vsc = voronoiSceneComponents;
-    vsc.sites.forEach((s, i) => Object.assign( s, pf3(i).lerp( pf4(i).lerp(pf(i), sinN(time*6,28)), 0.2) ))
+    vsc.sites.forEach((s, i) => Object.assign( s, pf3(i, t).lerp( pf4(i, t).lerp(pf(i, t), sinN(t*6,28)), 0.2) ))
     // Object.assign(vsc.sites[0], {x: 0, y: 0});
     
     try {
@@ -154,6 +155,17 @@ function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=fa
 
     let triangulatedPts = Earcut.triangulate(cellPts.flat(), [], 2);
 
+    //todo bug - for some reason, using indexed drawing creates a new buffer on GPU with each draw call
+    // for(let i = 0; i < cell.halfedges.length; i++) {
+    //     cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[i*2]   + 1)/2;
+    //     cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[i*2+1] +1 )/2
+
+    //     cellBuffers.cell3d[i*3]   = cellBuffers.cellPts[i*2];
+    //     cellBuffers.cell3d[i*3+1] = cellBuffers.cellPts[i*2+1];
+    //     cellBuffers.cell3d[i*3+2] = 0;
+    // }
+    // bufferGeom.setIndex(triangulatedPts2);
+
     triangulatedPts.forEach((ind, i) => {
         // uv of whole quad
         // cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[ind*2]   + 1)/2;
@@ -166,7 +178,6 @@ function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=fa
         cellBuffers.cell3d[i*3+1] = cellBuffers.cellPts[ind*2+1];
         cellBuffers.cell3d[i*3+2] = 0;
     });
-    []
     bufferGeom.setDrawRange(0, triangulatedPts.length)
 
     if(initialCreation) {
@@ -216,13 +227,13 @@ function timeNoise2d(xRand, yRand, time){
 }
 
 function animate() {
-    // requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
 
     renderer.render(voronoiSceneComponents.scene, cam);
 
-    time = Date.now() / 1000 * 0.08;
+    time = Date.now() / 1000 - startTime;
    
-    updateVoronoiScene(time);
+    updateVoronoiScene(time * 0.08);
 
     stats.update();
 }
@@ -259,9 +270,9 @@ uniform float time;
 uniform float ind;
 
 void main()	{
-    float t = time*3.;
+    float t = time*.03; //todo bug - why does commenting this line out stop "time" uniform value from being bound?
     float col = pow(1. - abs(distance(vUv, vec2(0.5)) - sinN(t)/2.)*4., 4.);
     float col2 = pow(1. - distance(vec2(sinN(t), cosN(t)), vUv), 4.);
-    gl_FragColor = vec4(vec3(hash(vec3(ind, 4., 3.))), 1.);
+    gl_FragColor = vec4(vec3(sinN(time)), 1.);
 }`;
 
