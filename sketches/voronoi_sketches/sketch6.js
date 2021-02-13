@@ -16,7 +16,7 @@ function range(size, startAt = 0) {
 let randColor = () =>  '#'+Math.floor(Math.random()*16777215).toString(16);
 
 let simplex = new SimplexNoise();
-let numSites = 4;
+let numSites = 8**2;
 let numVert = numSites + 8; //each polygon buffer will have to have enough verts to account for each other polygon and the bounding box sides
 let voronoi = new Voronoi(); 
 let voronoiSceneComponents = {
@@ -68,10 +68,6 @@ function createVoronoiScene() {
     vsc.meshes.forEach((mesh, i) => {
         mesh.onBeforeRender = (renderer, scene, camera, geometry, material, group) => {
             material.uniforms.time.value = time/0.08*2;
-            if(i == 0 && nth++%15 == 0) {
-                material.uniforms.ind.value = nth;
-                console.log(material.uniforms.time.value)
-            }
          }
     })
 
@@ -145,6 +141,26 @@ let getCellBBox = pts => {
         if(y < minY) minY = y;
     }
     return {maxX, maxY, minX, minY, xRange: maxX-minX, yRange: maxY-minY};
+}
+
+let rangeMap = (n, min, range) => (n-min)/range;
+
+function boxSquashUVs(pts) {
+    let bbox = getCellBBox(pts);
+    let normedPts = pts.map(([x, y]) => [rangeMap(x, bbox.minX, bbox.xRange), rangeMap(y, bbox.minY, bbox.yRange)]);
+
+    let mappedPts = normedPts.map(([x, y]) => {
+        let diag1 = y/x; //if this is > 1, point is above bottom-left/top-right diagonal
+        let diag2 = y/(1-x) //if this is > 1, point is above the top-left/bottom-right diagonal
+
+        //project a point of a polygon onto a side of the bounding box of the polygon
+        if(diag1 >= 1 && diag2 >= 1) return [x, bbox.maxY]; //top
+        if(diag1 < 1 && diag2 < 1)   return [x, bbox.minY]; //bottom
+        if(diag1 >= 1 && diag2 < 1)  return [bbox.minX, y]; //left
+        if(diag1 < 1 && diag2 >= 1)  return [bbox.maxX, y]; //right
+    });
+
+    return mappedPts;
 }
 
 function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=false) {
@@ -261,8 +277,8 @@ uniform float ind;
 
 void main()	{
     float t = time*.03; //todo - why does commenting this line out stop "time" uniform value from being bound?
-    float col = pow(1. - abs(distance(vUv, vec2(0.5)) - sinN(t)/2.)*4., 4.);
+    float col = pow(1. - abs(distance(vUv, vec2(0.5)) - sinN(t+ind)/2.)*4., 4.);
     float col2 = pow(1. - distance(vec2(sinN(t), cosN(t)), vUv), 4.);
-    gl_FragColor = vec4(vec3(sinN(t)), 1.);
+    gl_FragColor = vec4(vec3(col), 1.);
 }`;
 
