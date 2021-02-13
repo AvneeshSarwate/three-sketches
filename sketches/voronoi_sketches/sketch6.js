@@ -16,7 +16,7 @@ function range(size, startAt = 0) {
 let randColor = () =>  '#'+Math.floor(Math.random()*16777215).toString(16);
 
 let simplex = new SimplexNoise();
-let numSites = 8**2;
+let numSites = 2**2;
 let numVert = numSites + 8; //each polygon buffer will have to have enough verts to account for each other polygon and the bounding box sides
 let voronoi = new Voronoi(); 
 let voronoiSceneComponents = {
@@ -147,17 +147,26 @@ let rangeMap = (n, min, range) => (n-min)/range;
 
 function boxSquashUVs(pts) {
     let bbox = getCellBBox(pts);
+
+    /* need to make sure there are at least 2 points per side of 
+       bounding box, so you can properly "squash" the bounding box square
+    */
+
     let normedPts = pts.map(([x, y]) => [rangeMap(x, bbox.minX, bbox.xRange), rangeMap(y, bbox.minY, bbox.yRange)]);
 
     let mappedPts = normedPts.map(([x, y]) => {
         let diag1 = y/x; //if this is > 1, point is above bottom-left/top-right diagonal
         let diag2 = y/(1-x) //if this is > 1, point is above the top-left/bottom-right diagonal
 
+        // handle 0/0 corner cases from above computation
+        if(y == 0 && x == 0) return [0, 0];
+        if(y == 0 && x == 1) return [1, 0];
+
         //project a point of a polygon onto a side of the bounding box of the polygon
-        if(diag1 >= 1 && diag2 >= 1) return [x, bbox.maxY]; //top
-        if(diag1 < 1 && diag2 < 1)   return [x, bbox.minY]; //bottom
-        if(diag1 >= 1 && diag2 < 1)  return [bbox.minX, y]; //left
-        if(diag1 < 1 && diag2 >= 1)  return [bbox.maxX, y]; //right
+        if(diag1 >= 1 && diag2 >= 1) return [x, 1]; //top
+        if(diag1 < 1 && diag2 < 1)   return [x, 0]; //bottom
+        if(diag1 >= 1 && diag2 < 1)  return [0, y]; //left
+        if(diag1 < 1 && diag2 >= 1)  return [1, y]; //right
     });
 
     return mappedPts;
@@ -170,14 +179,20 @@ function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=fa
     let cellBBox = getCellBBox(cellPts);
 
     let triangulatedPts = Earcut.triangulate(cellPts.flat(), [], 2);
+    let squashBoxUvs = boxSquashUVs(cellPts).flat();
 
     triangulatedPts.forEach((ind, i) => {
         // uv of whole quad
         // cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[ind*2]   + 1)/2;
         // cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[ind*2+1] +1 )/2
 
-        cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[ind*2]   - cellBBox.minX)/cellBBox.xRange;
-        cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[ind*2+1] - cellBBox.minY)/cellBBox.yRange;
+
+        // uvs based on bounding box of voronoi cell
+        // cellBuffers.uvPts[i*2]   = (cellBuffers.cellPts[ind*2]   - cellBBox.minX)/cellBBox.xRange;
+        // cellBuffers.uvPts[i*2+1] = (cellBuffers.cellPts[ind*2+1] - cellBBox.minY)/cellBBox.yRange;
+
+        cellBuffers.uvPts[i*2]   = squashBoxUvs[ind*2];
+        cellBuffers.uvPts[i*2+1] = squashBoxUvs[ind*2+1];
     
         cellBuffers.cell3d[i*3]   = cellBuffers.cellPts[ind*2];
         cellBuffers.cell3d[i*3+1] = cellBuffers.cellPts[ind*2+1];
