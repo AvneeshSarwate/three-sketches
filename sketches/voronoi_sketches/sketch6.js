@@ -146,13 +146,25 @@ let getCellBBox = pts => {
 let rangeMap = (n, min, range) => (n-min)/range;
 
 function boxSquashUVs(pts) {
+    /*
+    TODO - to calculate where to add points and how to assign UVs - 
+    From radius, "project" thru polygon to the 4 corners and midpoints of the bounding rect.
+    Map the bounding rect points to the intersection points on the polygon.
+    For other points, similarly project thru them to the bounding rect and map them to their
+    bounding rect points
+    */
+
     let bbox = getCellBBox(pts);
+    let normalize = ([x, y]) => [rangeMap(x, bbox.minX, bbox.xRange), rangeMap(y, bbox.minY, bbox.yRange)];
 
     /* need to make sure there are at least 2 points per side of 
        bounding box, so you can properly "squash" the bounding box square
     */
+    let pointsAndSides = pts.map(pt => {
 
-    let normedPts = pts.map(([x, y]) => [rangeMap(x, bbox.minX, bbox.xRange), rangeMap(y, bbox.minY, bbox.yRange)]);
+    });
+
+    let normedPts = pts.map(normalize);
 
     let mappedPts = normedPts.map(([x, y]) => {
         let diag1 = y/x; //if this is > 1, point is above bottom-left/top-right diagonal
