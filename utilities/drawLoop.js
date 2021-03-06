@@ -1,4 +1,5 @@
 import {oscV, oscH} from '../../utilities/oscManager.js';
+import * as THREE from "../node_modules/three/build/three.module.js";
 
 let mod = function(t, n) {
     return ((t % n) + n) % n;
@@ -16,18 +17,18 @@ class DrawLoop {
         this.deltaHistory = [];
         this.ind = 0;
         this.pos = pos;
-        this.transform = a => a;
+        this.transform = a => a.clone();
         this.wrapBox = {
             x: {min: -1, max: 1},
             y: {min: -1, max: 1},
         }
+        this.deltaScale = new THREE.Vector3(2, 2, 0);
     }
 
     update(deltaTransform) {
         this.ind %= this.deltas.length;
 
-        if (!deltaTransform) deltaTransform = a => a;
-        let newDelta = deltaTransform(this.deltas[this.ind]);
+        let newDelta = deltaTransform(this.deltas[this.ind]).multiply(this.deltaScale);
         this.pos.add(newDelta);
 
         let newX = rangeWrap(this.pos.x, this.wrapBox.x.min, this.wrapBox.x.max);
