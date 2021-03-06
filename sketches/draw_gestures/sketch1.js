@@ -1,6 +1,11 @@
 import * as THREE from "../../node_modules/three/build/three.module.js";
 import Stats from "../../node_modules/three/examples/jsm/libs/stats.module.js";
 import header_code from "../../header_frag.js";
+
+import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
+import {Gesture, gestureManager} from '../../utilities/animationManager.js';
+import {oscV, oscH} from '../../utilities/oscManager.js';
+
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
 const glsl = a => a[0];

@@ -5,11 +5,19 @@ let oscValueStorage = {};
 class OscHandler {
     constructor(){
         this.handlers = {}
+        this.dedupHandlers = {};
+        this.dedupTracker = {};
     }
 
     //handler functions take a single array of args and should use destructuring assignment
-    setHandler(addr, msgHandler){
+    on(addr, msgHandler){
         this.handlers[addr] = msgHandler
+    }
+
+    //method to handle issue of OSC apps sending duplicate messages to windows.
+    //only triggers if no message has come in for this address N miliseconds before
+    on2(addr, msgHandler, waitTime){
+        this.dedupHandlers[addr] = {msgHandler, waitTime, lastEvt: Date.now()};
     }
 }
 
@@ -32,8 +40,17 @@ oscPort.on("message", (message) => {
     oscValueStorage[addrKey].unread = true;
     oscValueStorage[addrKey].seen = true;
 
-    let msgHanlder = oscHandler.handlers[address];
-    if(msgHanlder) msgHanlder(args); 
+    let msgHandler = oscHandler.handlers[address];
+    if(msgHandler) msgHandler(args); 
+
+    let dedupHandler = oscHandler.dedupHandlers[address];
+    if(dedupHandler) {
+        let nowTime = Date.now();
+        if(nowTime - dedupHandler.lastEvt < dedupHandler.waitTime){
+            dedupHandler.msgHandler(args)
+        }
+        dedupHandler.lastEvt = nowTime;
+    }
 })
 
 

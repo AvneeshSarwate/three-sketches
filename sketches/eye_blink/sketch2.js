@@ -18,22 +18,22 @@ let upDown = a => (0.5 - Math.abs(a-0.5))*2
 let eye1rot_gest = new Gesture('rotate_1', (gTime, gPhase) => {
     eyeTransforms.eye1rot = gPhase * Math.PI *2;
 }, null, null, 1);
-oscH.setHandler('/rotate_1', ([vel]) =>  vel > 0 ? eye1rot_gest.start(vel/127 * 4) : 0 );
+oscH.on('/rotate_1', ([vel]) =>  vel > 0 ? eye1rot_gest.start(vel/127 * 4) : 0 );
 
 let eye2rot_gest = new Gesture('rotate_2', (gTime, gPhase) => {
     eyeTransforms.eye2rot = gPhase * Math.PI *2;
 }, null, null, 1);
-oscH.setHandler('/rotate_2', ([vel]) =>  vel > 0 ? eye2rot_gest.start(vel/127 * 4) : 0 );
+oscH.on('/rotate_2', ([vel]) =>  vel > 0 ? eye2rot_gest.start(vel/127 * 4) : 0 );
 
 let eye1blink_gest = new Gesture('blink_1', (gTime, gPhase) => {
     eyeballUniforms_1.frameInd.value = gPhase;
 }, null, null, 1);
-oscH.setHandler('/blink_1', ([vel]) =>  vel > 0 ? eye1blink_gest.start(vel/127 * 4) : 0 );
+oscH.on('/blink_1', ([vel]) =>  vel > 0 ? eye1blink_gest.start(vel/127 * 4) : 0 );
 
 let eye2blink_gest = new Gesture('blink_2', (gTime, gPhase) => {
     eyeballUniforms_2.frameInd.value = gPhase;
 }, null, null, 1);
-oscH.setHandler('/blink_2', ([vel]) =>  vel > 0 ? eye2blink_gest.start(vel/127 * 4) : 0 );
+oscH.on('/blink_2', ([vel]) =>  vel > 0 ? eye2blink_gest.start(vel/127 * 4) : 0 );
 
 
 const gui = new dat.GUI();
