@@ -30,26 +30,31 @@ let oscPort = new osc.WebSocketPort({
 oscPort.open();
 
 oscPort.on("message", (message) => {
-    let {address, args} = message;
-    let addrKey = address.slice(1);
-    // console.log("osc", message);
+    try {
+        let {address, args} = message;
+        let addrKey = address.slice(1);
 
-    if(!oscValueStorage[addrKey]) oscValueStorage[addrKey] = {};
+        if(!oscValueStorage[addrKey]) oscValueStorage[addrKey] = {};
 
-    oscValueStorage[addrKey].v = args;
-    oscValueStorage[addrKey].unread = true;
-    oscValueStorage[addrKey].seen = true;
+        oscValueStorage[addrKey].v = args;
+        oscValueStorage[addrKey].unread = true;
+        oscValueStorage[addrKey].seen = true;
 
-    let msgHandler = oscHandler.handlers[address];
-    if(msgHandler) msgHandler(args); 
+        let msgHandler = oscHandler.handlers[address];
+        if(msgHandler) msgHandler(args); 
 
-    let dedupHandler = oscHandler.dedupHandlers[address];
-    if(dedupHandler) {
-        let nowTime = Date.now();
-        if(nowTime - dedupHandler.lastEvt < dedupHandler.waitTime){
-            dedupHandler.msgHandler(args)
+        let dedupHandler = oscHandler.dedupHandlers[address];
+        if(dedupHandler) {
+            // console.log("osc", message);
+
+            let nowTime = Date.now();
+            if(nowTime - dedupHandler.lastEvt < dedupHandler.waitTime){
+                dedupHandler.msgHandler(args)
+            }
+            dedupHandler.lastEvt = nowTime;
         }
-        dedupHandler.lastEvt = nowTime;
+    } catch(e) {
+        console.error(e)
     }
 })
 

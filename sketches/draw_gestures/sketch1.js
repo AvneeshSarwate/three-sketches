@@ -14,26 +14,29 @@ const glsl = a => a[0];
 
 let recordingManager = new RecordingManager('xyPad', 'recordSelector');
 let runningLoops = [];
-let v3 = (x, y) => new THREE.Vector3(x, y, 0);
+let v3 = ({x, y}) => new THREE.Vector3(x, y, 0);
 [1, 2, 3, 4].forEach(i => {
-    oscH.on2(`/playbackTrigger/${i}`, ([onOff]) => {
+    oscH.on2(`/playbackTrigger/${i}/1`, ([onOff]) => {
         if(onOff){
-            let loop = new DrawLoop(v3(recordingManager.lastTouch));
-            loop.deltas = recordingManager.loops[i].map(d => v3(d.x, d.y));
+            console.log("playLoop", i)
+            let loop = new DrawLoop(v3(recordingManager.lastTouch[1]));
+            loop.deltas = recordingManager.loops[i].map(d => v3(d));
             let mesh = createDrawLoopMesh();
 
             sceneInfo.scene.add(mesh);
             runningLoops.push({loop, mesh})
         }
-    });
+    }, 10);
 });
+
+
 
 let randColor = () => '#'+(Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0');
 
 function runLoops(){
     runningLoops.forEach(lm =>{
         lm.loop.step();
-        lm.mesh.position.copy(lm.loop.po);
+        lm.mesh.position.copy(lm.loop.pos);
     })
 }
 
@@ -89,6 +92,10 @@ function init() {
     container.appendChild(stats.dom);
 
     window.addEventListener("resize", onWindowResize, false);
+
+    window.recordingManager = recordingManager;
+    window.runningLoops = runningLoops;
+    window.sceneInfo = sceneInfo;
 }
 
 function onWindowResize() {

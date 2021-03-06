@@ -30,8 +30,13 @@ class DrawLoop {
         let newDelta = deltaTransform(this.deltas[this.ind]);
         this.pos.add(newDelta);
 
-        this.pos.x = rangeWrap(this.pos.x, this.wrapBox.x.min, this.wrapBox.x.max);
-        this.pos.y = rangeWrap(this.pos.y, this.wrapBox.y.min, this.wrapBox.y.max);
+        let newX = rangeWrap(this.pos.x, this.wrapBox.x.min, this.wrapBox.x.max);
+        let newY = rangeWrap(this.pos.y, this.wrapBox.y.min, this.wrapBox.y.max);
+        if(isNaN(newX) || isNaN(newY)) {
+            debugger;
+        }
+        this.pos.x = newX;
+        this.pos. y = newY;
         this.ind++;
     }
 
@@ -49,30 +54,36 @@ class RecordingManager {
         this.resetDrawStart = {};
         this.drawStart = {}
         this.loops = {};
+        this.recordingIndex = 0;
         [1, 2, 3, 4].forEach(i => {
 
             oscH.on2(`/${recordAddr}/${i}/1`, ([onOff]) => {
                 if(onOff){
-                    this.isRecording[i] = !!onOff;
+                    this.isRecording[i] = true;
                     this.loops[i] = [];
                     this.resetDrawStart[i] = true;
+                    this.recordingIndex = i;
                 }
             }, 10)
 
             oscH.on2(`/${xyAddr}/${i}/z`, ([onOff]) => {
                 if(!onOff) {
-                    this.isRecording[i] = !!onOff;
+                    this.isRecording[i] = false;
                 }
             }, 10);
 
             oscH.on2(`/${xyAddr}/${i}`, ([x, y]) => {
-                if(this.isRecording[i]) {
-                    if(this.resetDrawStart[i]) {
-                        this.resetDrawStart[i] = false;
-                        this.drawStart[i] = {x, y};
+                let rind = this.recordingIndex;
+                if(this.isRecording[rind]) {
+                    console.log("rec", rind)
+                    if(this.resetDrawStart[rind]) {
+                        this.resetDrawStart[rind] = false;
+                        this.drawStart[rind] = {x, y};
+                        console.log("dstart", rind)
                     } else {
                         let lt = this.lastTouch[i];
-                        this.loops[i].push({x: x - lt.x, y: y - lt.y});
+                        this.loops[rind].push({x: x - lt.x, y: y - lt.y});
+                        console.log("ddelt", rind)
                     }
                 }
                 this.lastTouch[i] = {x, y};
