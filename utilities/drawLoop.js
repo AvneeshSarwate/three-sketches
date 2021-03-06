@@ -41,6 +41,7 @@ class DrawLoop {
     }
 }
 
+//recording and playback of loops based on https://www.dropbox.com/s/y8a4357hjjjg94j/gesture_vis.touchosc?dl=0
 class RecordingManager {
     constructor(xyAddr, recordAddr) {
         this.lastTouch = {};

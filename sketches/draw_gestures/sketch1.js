@@ -5,10 +5,44 @@ import header_code from "../../header_frag.js";
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 import {Gesture, gestureManager} from '../../utilities/animationManager.js';
 import {oscV, oscH} from '../../utilities/oscManager.js';
+import {DrawLoop, RecordingManager} from '../../utilities/drawLoop.js';
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
 const glsl = a => a[0];
+
+
+let recordingManager = new RecordingManager('xyPad', 'recordSelector');
+let runningLoops = [];
+let v3 = (x, y) => new THREE.Vector3(x, y, 0);
+[1, 2, 3, 4].forEach(i => {
+    oscH.on2(`/playbackTrigger/${i}`, ([onOff]) => {
+        if(onOff){
+            let loop = new DrawLoop(v3(recordingManager.lastTouch));
+            loop.deltas = recordingManager.loops[i].map(d => v3(d.x, d.y));
+            let mesh = createDrawLoopMesh();
+
+            sceneInfo.scene.add(mesh);
+            runningLoops.push({loop, mesh})
+        }
+    });
+});
+
+let randColor = () => '#'+(Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0');
+
+function runLoops(){
+    runningLoops.forEach(lm =>{
+        lm.loop.step();
+        lm.mesh.position.copy(lm.loop.po);
+    })
+}
+
+function createDrawLoopMesh() {
+    let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
+    let material = new THREE.MeshBasicMaterial({color: randColor()});
+    let mesh = new THREE.Mesh(circle, material);
+    return mesh;
+}
 
 let camera, renderer, stats, sceneInfo, time;
 const startTime = Date.now()/1000;
@@ -63,6 +97,8 @@ function onWindowResize() {
 
 function animate() {
     requestAnimationFrame(animate);
+
+    runLoops();
 
     time = Date.now()/1000 - startTime;
     sceneInfo.uniforms.time.value = time;
