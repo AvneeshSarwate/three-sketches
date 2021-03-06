@@ -68,22 +68,20 @@ class RecordingManager {
 
             oscH.on2(`/${xyAddr}/${i}/z`, ([onOff]) => {
                 if(!onOff) {
-                    this.isRecording[i] = false;
+                    this.isRecording[this.recordingIndex] = false;
                 }
             }, 10);
 
             oscH.on2(`/${xyAddr}/${i}`, ([x, y]) => {
+                y = 1 - y; //touchOSC has y=0 at bottom instead of top
                 let rind = this.recordingIndex;
                 if(this.isRecording[rind]) {
-                    console.log("rec", rind)
                     if(this.resetDrawStart[rind]) {
                         this.resetDrawStart[rind] = false;
                         this.drawStart[rind] = {x, y};
-                        console.log("dstart", rind)
                     } else {
                         let lt = this.lastTouch[i];
                         this.loops[rind].push({x: x - lt.x, y: y - lt.y});
-                        console.log("ddelt", rind)
                     }
                 }
                 this.lastTouch[i] = {x, y};
