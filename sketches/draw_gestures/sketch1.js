@@ -16,7 +16,7 @@ let recordingManager = new RecordingManager('xyPad', 'recordSelector');
 let runningLoops = [];
 let v3 = ({x, y}) => new THREE.Vector3(x, y, 0);
 [1, 2, 3, 4].forEach(i => {
-    oscH.on2(`/playbackTrigger/${i}/1`, ([onOff]) => {
+    oscH.on(`/playbackTrigger/${i}/1`, ([onOff]) => {
         if(onOff){
             console.log("playLoop", i)
             let loop = new DrawLoop(v3(recordingManager.lastTouch[1]));

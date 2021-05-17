@@ -58,7 +58,7 @@ class RecordingManager {
         this.recordingIndex = 0;
         [1, 2, 3, 4].forEach(i => {
 
-            oscH.on2(`/${recordAddr}/${i}/1`, ([onOff]) => {
+            oscH.on(`/${recordAddr}/${i}/1`, ([onOff]) => {
                 if(onOff){
                     this.isRecording[i] = true;
                     this.loops[i] = [];
@@ -67,13 +67,13 @@ class RecordingManager {
                 }
             }, 10)
 
-            oscH.on2(`/${xyAddr}/${i}/z`, ([onOff]) => {
+            oscH.on(`/${xyAddr}/${i}/z`, ([onOff]) => {
                 if(!onOff) {
                     this.isRecording[this.recordingIndex] = false;
                 }
             }, 10);
 
-            oscH.on2(`/${xyAddr}/${i}`, ([x, y]) => {
+            oscH.on(`/${xyAddr}/${i}`, ([x, y]) => {
                 y = 1 - y; //touchOSC has y=0 at bottom instead of top
                 let rind = this.recordingIndex;
                 if(this.isRecording[rind]) {

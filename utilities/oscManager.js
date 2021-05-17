@@ -15,7 +15,8 @@ class OscHandler {
     }
 
     //method to handle issue of OSC apps sending duplicate messages to windows.
-    //only triggers if no message has come in for this address N miliseconds before
+    //only triggers if no message has come in for this address {waitTime} miliseconds before
+    //WILL NOT WORK IF MESSAGES ARE **NOT** BEING DOUBLE SENT
     on2(addr, msgHandler, waitTime){
         this.dedupHandlers[addr] = {msgHandler, waitTime, lastEvt: Date.now()};
     }
@@ -24,7 +25,7 @@ class OscHandler {
 let oscHandler = new OscHandler();
 
 let oscPort = new osc.WebSocketPort({
-    url: "ws://localhost:8081"
+    url: `ws://${location.hostname}:8081`
 });
 
 oscPort.open();
@@ -43,6 +44,7 @@ oscPort.on("message", (message) => {
         let msgHandler = oscHandler.handlers[address];
         if(msgHandler) msgHandler(args); 
 
+        //message handling for the handlers set with the on2() method (for windows message duplication bug)
         let dedupHandler = oscHandler.dedupHandlers[address];
         if(dedupHandler) {
             // console.log("osc", message);
@@ -53,6 +55,7 @@ oscPort.on("message", (message) => {
             }
             dedupHandler.lastEvt = nowTime;
         }
+
     } catch(e) {
         console.error(e)
     }
