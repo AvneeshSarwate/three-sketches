@@ -91,8 +91,33 @@ class RecordingManager {
     }
 }
 
+function saveLoops(recordingManager, loopSetName='default_name') {
+    let sketchPath = window.location.pathname;
+    let sketchId = (new URLSearchParams(window.location.search)).get('id');
+    let bodyData = {
+        sketchPath, 
+        loopSetName, 
+        loopsAndMetaData: {
+            sketchPath,
+            loopSetName,
+            sketchId,
+            loops: recordingManager.loops
+        }
+    }
+    fetch('/saveGestureLoops', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyData)
+    }).then(res => {
+        console.log("save attempted", res, bodyData);
+    })
+}
+
 
 export {
     DrawLoop,
-    RecordingManager
+    RecordingManager,
+    saveLoops
 }

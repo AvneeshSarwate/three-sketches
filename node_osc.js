@@ -2,6 +2,9 @@ var osc = require("osc"),
     express = require("express"),
     WebSocket = require("ws");
 
+var fs = require('fs');
+const bodyParser = require('body-parser');
+
 
 // draft of serving basic page from node also
 const app2 = express();
@@ -16,6 +19,33 @@ app2.get('/', (req, res) => {
 app2.listen(SERVING_PORT, () => {
     console.log(`serving app listening at http://localhost:${SERVING_PORT}`)
 });
+
+app2.use(
+    express.urlencoded({
+        extended: true
+    })
+);
+  
+app2.use(express.json());
+
+
+function warnIfError(err, msg){
+    if(err) console.warn(msg);
+}
+
+app2.post('/saveGestureLoops', (req, res) => {
+    console.log('body', req.body);
+    let {loopsAndMetaData, sketchPath, loopSetName } = req.body;
+    console.log("sketch path", sketchPath);
+    let sketchDir = sketchPath.slice(1);
+    fs.open(`${sketchDir}/${loopSetName}_${Date.now()}.json`, 'w', (err, loopFile) => {
+        warnIfError(err, "error creating loop file");
+        fs.writeFile(loopFile, JSON.stringify(loopsAndMetaData), err => warnIfError(err, "error writing loop file"));
+        fs.close(loopFile, err => warnIfError(err, "error writing loop file"));
+    });
+    
+    res.sendStatus(200);
+})
 
 
 const WEB_SOCKET_PORT = 8081;
