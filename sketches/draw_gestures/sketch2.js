@@ -23,7 +23,7 @@ let v3 = ({x, y}) => new THREE.Vector3(x, y, 0);
             loop.deltas = recordingManager.loops[i].map(d => v3(d));
             let mesh = createDrawLoopMesh();
 
-            sceneInfo.scene.add(mesh);
+            gestureSceneInfo.scene.add(mesh);
             runningLoops.push({loop, mesh})
         }
     }, 10);
@@ -55,10 +55,15 @@ function createDrawLoopMesh() {
     return mesh;
 }
 
-let camera, renderer, stats, sceneInfo, time;
+let camera, renderer, stats, time, fdbkInd = 0;
+let gestureSceneInfo, feedbackSceneInfo, passthruSceneInfo;
 const startTime = Date.now()/1000;
 
-function createScene() {
+const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+const gestureSceneTarget = newTarget();
+let feedbackTargets = [0,1].map(newTarget);
+
+function createGestureScene() {
     let circle = new THREE.CircleBufferGeometry(0.2, 10, 10);
 
     let uniforms = {
@@ -80,8 +85,58 @@ function createScene() {
     return {scene, uniforms};
 }
 
+function createFeedbackScene(){
+    let plane = new THREE.PlaneBufferGeometry(2, 2);
+
+    let uniforms = {
+        backbuffer: { value: feedbackTargets[0].texture},
+        scene:      { value: gestureSceneTarget.texture},
+        time :      { value : 0}
+    } 
+
+    let feedbackMaterial = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: vertexShader,
+        fragmentShader: header_code + feedbackShader
+
+    });
+
+    let feedbackMesh = new THREE.Mesh(plane, feedbackMaterial);
+
+    let scene = new THREE.Scene();
+
+    scene.add(feedbackMesh);
+
+    return {scene, uniforms}
+}
+
+function createPassthroughScene() {
+    let plane = new THREE.PlaneBufferGeometry(2, 2);
+
+    let uniforms = {
+        passthru: { value: feedbackTargets[(fdbkInd+1)%2].texture}
+    }
+
+    let passthruMaterial = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader: vertexShader,
+        fragmentShader: passthruShader
+    });
+
+    let passthruMesh = new THREE.Mesh(plane, passthruMaterial);
+
+    let scene = new THREE.Scene();
+
+    scene.add(passthruMesh);
+
+    return {scene, uniforms};
+}
+
+
 function init() {
-    sceneInfo = createScene();
+    gestureSceneInfo = createGestureScene();
+    feedbackSceneInfo = createFeedbackScene();
+    passthruSceneInfo = createPassthroughScene();
 
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     
@@ -103,11 +158,12 @@ function init() {
 
     window.recordingManager = recordingManager;
     window.runningLoops = runningLoops;
-    window.sceneInfo = sceneInfo;
+    window.sceneInfo = gestureSceneInfo;
 }
 
 function onWindowResize() {
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    const scale = 2;
+    renderer.setSize(window.innerWidth/scale, window.innerHeight/scale);
 }
 
 function animate() {
@@ -116,10 +172,22 @@ function animate() {
     runLoops();
 
     time = Date.now()/1000 - startTime;
-    sceneInfo.uniforms.time.value = time;
-    renderer.render(sceneInfo.scene, camera);
+
+    gestureSceneInfo.uniforms.time.value = time;
+    renderer.setRenderTarget(gestureSceneTarget);
+    renderer.render(gestureSceneInfo.scene, camera);
+
+    feedbackSceneInfo.uniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
+    feedbackSceneInfo.uniforms.time.value = time;
+    renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
+    renderer.render(feedbackSceneInfo.scene, camera);
+
+    passthruSceneInfo.uniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
+    renderer.setRenderTarget(null);
+    renderer.render(passthruSceneInfo.scene, camera);
 
     stats.update();
+    fdbkInd++;
 }
 
 export {
@@ -146,4 +214,26 @@ uniform float time;
 
 void main()	{
     gl_FragColor = vec4(vUv, sinN(time), 1.);
+}`;
+
+let feedbackShader = glsl`
+varying vec2 vUv;
+
+uniform float time;
+uniform sampler2D scene;
+uniform sampler2D backbuffer;
+
+void main() {
+    vec4 sceneCol = texture(scene, vUv);
+    vec4 bb = texture(backbuffer, vUv);
+    gl_FragColor = mix(sceneCol, bb, 0.8);
+}
+`;
+
+let passthruShader = glsl`
+varying vec2 vUv;
+uniform sampler2D passthru;
+
+void main()	{
+    gl_FragColor = texture(passthru, vUv);
 }`;
