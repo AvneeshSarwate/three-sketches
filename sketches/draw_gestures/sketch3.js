@@ -3,7 +3,9 @@ import Stats from "../../node_modules/three/examples/jsm/libs/stats.module.js";
 import header_code from "../../header_frag.js";
 
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
+// eslint-disable-next-line no-unused-vars
 import {Gesture, gestureManager} from '../../utilities/animationManager.js';
+// eslint-disable-next-line no-unused-vars
 import {oscV, oscH} from '../../utilities/oscManager.js';
 import {DrawLoop, RecordingManager, saveLoops} from '../../utilities/drawLoop.js';
 
@@ -11,6 +13,7 @@ import {DrawLoop, RecordingManager, saveLoops} from '../../utilities/drawLoop.js
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
 const glsl = a => a[0];
 
+const SCALE = 2; //how much to downscale resolution for prototyping
 
 /**
  * Goal - brush-heads of the 4 different gesture-types/recording-slots are rendered in their own composite-scene with feedback.
@@ -45,6 +48,7 @@ gui.add(datGuiProps, "loopSetName");
 
 
 
+// eslint-disable-next-line no-unused-vars
 let randColor = () => '#'+(Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0');
 
 function runLoops(){
@@ -54,14 +58,20 @@ function runLoops(){
     })
 }
 
-let drawLoopMaterial = new THREE.ShaderMaterial({
-    vertexShader: vertexShader,
-    uniforms: {
-        time: {value: 0},
-        gestureInd: {value: 0}
-    },
-    fragmentShader: header_code + drawLoopShader
-});
+//this annoying pattern is necessary to allow me to define all of my shaders at the end of the file
+//and also have the sketch have a "single point of entry" for reading in the init() function
+let drawLoopMaterial;
+function instantiateDrawLoopMaterial() {
+    return new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        uniforms: {
+            time: {value: 0},
+            gestureInd: {value: 0}
+        },
+        fragmentShader: header_code + drawLoopShader
+    });
+}
+
 
 function createDrawLoopMesh(gestureInd) {
     let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
@@ -75,8 +85,9 @@ let camera, renderer, stats, time, fdbkInd = 0;
 let passthruSceneInfo;
 const startTime = Date.now()/1000;
 let gestureScenes; //Todo need a better word for a "composite-scene" like is created with createGestureScene()
+let compositingScene;
 
-const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth/SCALE, window.innerHeight/SCALE);
 
 function createGestureScene(gestureInd) {
     let loopUniforms = {
@@ -136,11 +147,46 @@ function createFeedbackScene(gestureInd, loopTarget, fdbkTargets){
     return {scene, uniforms}
 }
 
-function createPassthroughScene() {
+function createCompositingScene(gestureScenes) {
     let plane = new THREE.PlaneBufferGeometry(2, 2);
 
     let uniforms = {
-        passthru: { value: feedbackTargets[(fdbkInd+1)%2].texture}
+        time: {value: 0},
+    };
+    [0, 1, 2, 3].forEach(i => {
+        uniforms['scene'+i] = {value: gestureScenes[i].getOutputTexture(fdbkInd)}
+    });
+
+    let material = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader,
+        fragmentShader: compositingShader
+    });
+
+    let mesh = new THREE.Mesh(plane, material);
+
+    let scene = new THREE.Scene();
+
+    scene.add(mesh);
+
+    let target = newTarget();
+
+    function renderCompositingScene() {
+        [0, 1, 2, 3].forEach(i => {
+            uniforms['scene'+i].value = gestureScenes[i].getOutputTexture(fdbkInd);
+        });
+        renderer.setRenderTarget(target);
+        renderer.render(scene, camera);
+    }
+
+    return {renderCompositingScene, target}
+}
+
+function createPassthroughScene(compositingScene) {
+    let plane = new THREE.PlaneBufferGeometry(2, 2);
+
+    let uniforms = {
+        passthru: { value: compositingScene.target.texture}
     }
 
     let passthruMaterial = new THREE.ShaderMaterial({
@@ -158,14 +204,13 @@ function createPassthroughScene() {
     return {scene, uniforms};
 }
 
-function createCompositingScene() {
-
-}
-
 
 function init() {
-    gestureScenes =[0, 1, 2, 3].map(i => createGestureScene(i));
-    passthruSceneInfo = createPassthroughScene();
+    drawLoopMaterial = instantiateDrawLoopMaterial();
+
+    gestureScenes = [0, 1, 2, 3].map(i => createGestureScene(i));
+    compositingScene = createCompositingScene(gestureScenes);
+    passthruSceneInfo = createPassthroughScene(compositingScene);
 
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     
@@ -187,12 +232,11 @@ function init() {
 
     window.recordingManager = recordingManager;
     window.runningLoops = runningLoops;
-    window.sceneInfo = gestureSceneInfo;
 }
 
 function onWindowResize() {
-    const scale = 2;
-    renderer.setSize(window.innerWidth/scale, window.innerHeight/scale);
+    renderer.setSize(window.innerWidth/SCALE, window.innerHeight/SCALE);
+    //todo - resize all targets
 }
 
 function animate() {
@@ -202,16 +246,12 @@ function animate() {
 
     time = Date.now()/1000 - startTime;
 
-    gestureSceneInfo.uniforms.time.value = time;
-    renderer.setRenderTarget(gestureSceneTarget);
-    renderer.render(gestureSceneInfo.scene, camera);
+    gestureScenes.forEach(gs => {
+        gs.renderGesture()
+    });
 
-    feedbackSceneInfo.uniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
-    feedbackSceneInfo.uniforms.time.value = time;
-    renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
-    renderer.render(feedbackSceneInfo.scene, camera);
+    compositingScene.renderCompositingScene();
 
-    passthruSceneInfo.uniforms.passthru.value = feedbackTargets[(fdbkInd+1)%2].texture;
     renderer.setRenderTarget(null);
     renderer.render(passthruSceneInfo.scene, camera);
 
@@ -236,6 +276,7 @@ void main()	{
 
 }`;
 
+// eslint-disable-next-line no-unused-vars
 let uvShader = glsl`
 varying vec2 vUv;
 
@@ -276,3 +317,28 @@ uniform float gestureInd;
 void main()	{
     gl_FragColor = vec4(vec3(sinN(time*gestureInd)), sinN(time*gestureInd*0.2));
 }`;
+
+let compositingShader = glsl`
+varying vec2 vUv;
+uniform float time;
+uniform sampler2D scene0;
+uniform sampler2D scene1;
+uniform sampler2D scene2;
+uniform sampler2D scene3;
+
+void main() {
+    vec4 col0 = texture(scene0, vUv);
+    vec4 col1 = texture(scene1, vUv);
+    vec4 col2 = texture(scene2, vUv);
+    vec4 col3 = texture(scene3, vUv);
+
+    vec4 pick1 = col0.a > col1.a ? col0 : col1;
+    vec4 pick2 = col2.a > col3.a ? col2 : col3;
+
+    vec4 pick = pick1.a > pick2.a ? pick1 : pick2;
+
+    gl_FragColor = pick;
+
+}
+
+`;
