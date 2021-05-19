@@ -87,7 +87,15 @@ const startTime = Date.now()/1000;
 let gestureScenes; //Todo need a better word for a "composite-scene" like is created with createGestureScene()
 let compositingScene;
 
-const newTarget = () => new THREE.WebGLRenderTarget(window.innerWidth/SCALE, window.innerHeight/SCALE);
+const targets = {};
+const newTarget = (key) => {
+    targets[key] = new THREE.WebGLRenderTarget(window.innerWidth/SCALE, window.innerHeight/SCALE);
+    return targets[key];
+}
+function createTargetSelector() {
+    datGuiProps['target'] = 'composite';
+    gui.add(datGuiProps, 'target', Object.keys(targets));
+}
 
 function createGestureScene(gestureInd) {
     let loopUniforms = {
@@ -97,8 +105,8 @@ function createGestureScene(gestureInd) {
 
     let loopScene = new THREE.Scene();
 
-    let feedbackTargets = [0,1].map(newTarget);
-    let loopTarget = newTarget();
+    let loopTarget = newTarget(`loopTarget_${gestureInd}`);
+    let feedbackTargets = [0,1].map(i => newTarget(`fdbk_${gestureInd}_${i}`));
 
     let feedbackSceneInfo = createFeedbackScene(gestureInd, loopTarget, feedbackTargets);
 
@@ -169,7 +177,7 @@ function createCompositingScene(gestureScenes) {
 
     scene.add(mesh);
 
-    let target = newTarget();
+    let target = newTarget('composite');
 
     function renderCompositingScene() {
         [0, 1, 2, 3].forEach(i => {
@@ -212,6 +220,8 @@ function init() {
     compositingScene = createCompositingScene(gestureScenes);
     passthruSceneInfo = createPassthroughScene(compositingScene);
 
+    createTargetSelector();
+
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     
     const container = document.getElementById("container");
@@ -237,6 +247,7 @@ function init() {
 function onWindowResize() {
     renderer.setSize(window.innerWidth/SCALE, window.innerHeight/SCALE);
     //todo - resize all targets
+    Object.values(targets).map(target => target.setSize(window.innerWidth/SCALE, window.innerHeight/SCALE))
 }
 
 function animate() {
@@ -252,6 +263,7 @@ function animate() {
 
     compositingScene.renderCompositingScene();
 
+    passthruSceneInfo.uniforms.passthru.value = targets[datGuiProps.target].texture;
     renderer.setRenderTarget(null);
     renderer.render(passthruSceneInfo.scene, camera);
 

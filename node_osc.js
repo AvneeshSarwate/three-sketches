@@ -3,7 +3,6 @@ var osc = require("osc"),
     WebSocket = require("ws");
 
 var fs = require('fs');
-const bodyParser = require('body-parser');
 
 
 // draft of serving basic page from node also

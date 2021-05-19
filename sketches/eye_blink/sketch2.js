@@ -12,8 +12,10 @@ let eyeTransforms = {
     eye2rot: 0,
 };
 
+// eslint-disable-next-line no-unused-vars
 let lerp = (n1, n2, a) => (1-a)*n1 + a*n2;
-let upDown = a => (0.5 - Math.abs(a-0.5))*2
+// eslint-disable-next-line no-unused-vars
+let upDown = a => (0.5 - Math.abs(a-0.5))*2 
 
 let eye1rot_gest = new Gesture('rotate_1', (gTime, gPhase) => {
     eyeTransforms.eye1rot = gPhase * Math.PI *2;
@@ -61,6 +63,7 @@ gui.add(eyePos, 'blinkRoll', 0, 1, 0.01);
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
 const glsl = a => a[0];
 
+// eslint-disable-next-line no-unused-vars
 const quant = (v, q) => Math.floor(v/q) * q;
 const sinN = n => (Math.sin(n)+1)/2;
 
@@ -324,6 +327,7 @@ function setEyeAnimationTransforms(){
     eyeball_2.rotateY(eyeTransforms.eye2rot);
 }
 
+// eslint-disable-next-line no-unused-vars
 function setVideoPlacementUniforms(eyeUniforms, eyeInd) {
     eyeUniforms.eyePos.value.set(eyePos.xEye, eyePos.yEye, eyePos.zoom)
     eyeUniforms.time.value = time;
