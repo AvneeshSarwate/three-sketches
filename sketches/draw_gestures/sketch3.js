@@ -46,7 +46,16 @@ const gui = new dat.GUI();
 gui.add(datGuiProps, "saveLoops");
 gui.add(datGuiProps, "loopSetName");
 
-
+function createDebugCircle(i){
+    let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
+    let material = new THREE.MeshBasicMaterial({color: randColor()});
+    let mesh = new THREE.Mesh(circle, material);
+    setInterval(() => {
+        mesh.position.x = Math.sin(Date.now()/1000 + i);
+        mesh.position.y = Math.cos(Date.now()/1000 + i);
+    }, 20)
+    return mesh;
+}
 
 // eslint-disable-next-line no-unused-vars
 let randColor = () => '#'+(Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0');
@@ -104,6 +113,11 @@ function createGestureScene(gestureInd) {
     };
 
     let loopScene = new THREE.Scene();
+
+    if(gestureInd == 0 || true) {
+        let debugMesh = createDebugCircle(gestureInd);
+        loopScene.add(debugMesh);
+    }
 
     let loopTarget = newTarget(`loopTarget_${gestureInd}`);
     let feedbackTargets = [0,1].map(i => newTarget(`fdbk_${gestureInd}_${i}`));
