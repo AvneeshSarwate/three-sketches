@@ -48,7 +48,7 @@ gui.add(datGuiProps, "loopSetName");
 
 function createDebugCircle(i){
     let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
-    let material = new THREE.MeshBasicMaterial({color: randColor()});
+    let material = new THREE.MeshBasicMaterial({color: '#FFFFFF'});
     let mesh = new THREE.Mesh(circle, material);
     setInterval(() => {
         mesh.position.x = Math.sin(Date.now()/1000 + i);
@@ -114,7 +114,7 @@ function createGestureScene(gestureInd) {
 
     let loopScene = new THREE.Scene();
 
-    if(gestureInd == 0 || true) {
+    if(gestureInd == 0) {
         let debugMesh = createDebugCircle(gestureInd);
         loopScene.add(debugMesh);
     }
@@ -323,7 +323,19 @@ uniform float gestureInd;
 void main() {
     vec4 sceneCol = texture(scene, vUv);
     vec4 bb = texture(backbuffer, vUv);
-    gl_FragColor = mix(sceneCol, bb, 0.8);
+    bool draw = sceneCol.a == 1.;
+    float decay = 0.01;
+    float fdbk = 0.;
+    vec3 col;
+    vec3 foreground = sceneCol.rgb;
+    vec3 background = black;
+    if(draw) {
+        fdbk = 1.;
+    } else {
+        fdbk = bb.a - decay;
+    }
+    col = mix(background, foreground, fdbk);
+    gl_FragColor = vec4(fdbk);
 }
 `;
 
@@ -341,7 +353,8 @@ uniform float time;
 uniform float gestureInd;
 
 void main()	{
-    gl_FragColor = vec4(vec3(sinN(time*gestureInd)), sinN(time*gestureInd*0.2));
+    vec4 col = vec4(vec3(sinN(time*gestureInd)), sinN(time*gestureInd*0.2));
+    gl_FragColor = vec4(1);
 }`;
 
 let compositingShader = glsl`
