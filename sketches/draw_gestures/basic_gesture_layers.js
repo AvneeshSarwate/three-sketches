@@ -3,10 +3,8 @@ import Stats from "../../node_modules/three/examples/jsm/libs/stats.module.js";
 import header_code from "../../header_frag.js";
 
 import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
-// eslint-disable-next-line no-unused-vars
-import {Gesture, gestureManager} from '../../utilities/animationManager.js';
-// eslint-disable-next-line no-unused-vars
-import {oscV, oscH} from '../../utilities/oscManager.js';
+import {Gesture, gestureManager} from '../../utilities/animationManager.js'; // eslint-disable-line no-unused-vars
+import {oscV, oscH} from '../../utilities/oscManager.js'; // eslint-disable-line no-unused-vars
 import {DrawLoop, RecordingManager, saveLoops} from '../../utilities/drawLoop.js';
 
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
@@ -30,7 +28,7 @@ let v3 = ({x, y}) => new THREE.Vector3(x, y, 0);
             console.log("playLoop", i)
             let loop = new DrawLoop(v3(recordingManager.lastTouch[1]));
             loop.deltas = recordingManager.loops[i].map(d => v3(d));
-            let mesh = createDrawLoopMesh(i-1);
+            let mesh = createDrawLoopMesh(gestureScenes[i-1].loopUniforms);
 
             gestureScenes[i-1].loopScene.add(mesh);
             runningLoops.push({loop, mesh})
@@ -46,10 +44,11 @@ const gui = new dat.GUI();
 gui.add(datGuiProps, "saveLoops");
 gui.add(datGuiProps, "loopSetName");
 
-function createDebugCircle(i){
-    let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
-    let material = new THREE.MeshBasicMaterial({color: '#FFFFFF'});
-    let mesh = new THREE.Mesh(circle, material);
+function createDebugCircle(uniforms, i){ // eslint-disable-line no-unused-vars
+    // let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
+    // let material = new THREE.MeshBasicMaterial({color: '#FFFFFF'});
+    // let mesh = new THREE.Mesh(circle, material);
+    let mesh = createDrawLoopMesh(uniforms);
     setInterval(() => {
         mesh.position.x = Math.sin(Date.now()/1000 + i);
         mesh.position.y = Math.cos(Date.now()/1000 + i);
@@ -82,10 +81,10 @@ function instantiateDrawLoopMaterial() {
 }
 
 
-function createDrawLoopMesh(gestureInd) {
+function createDrawLoopMesh(uniforms) {
     let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
     let material = drawLoopMaterial.clone();
-    material.uniforms.gestureInd = {value: gestureInd}
+    Object.assign(material.uniforms, uniforms);
     let mesh = new THREE.Mesh(circle, material);
     return mesh;
 }
@@ -114,10 +113,10 @@ function createGestureScene(gestureInd) {
 
     let loopScene = new THREE.Scene();
 
-    if(gestureInd == 0) {
-        let debugMesh = createDebugCircle(gestureInd);
-        loopScene.add(debugMesh);
-    }
+    // if(gestureInd == 0) {
+    //     let debugMesh = createDebugCircle(loopUniforms, gestureInd);
+    //     loopScene.add(debugMesh);
+    // }
 
     let loopTarget = newTarget(`loopTarget_${gestureInd}`);
     let feedbackTargets = [0,1].map(i => newTarget(`fdbk_${gestureInd}_${i}`));
@@ -139,7 +138,7 @@ function createGestureScene(gestureInd) {
         return feedbackTargets[(fdbkInd+1)%2].texture;
     }
 
-    return {loopScene, renderGesture, getOutputTexture};
+    return {loopScene, renderGesture, getOutputTexture, loopUniforms};
 }
 
 
@@ -324,18 +323,23 @@ void main() {
     vec4 sceneCol = texture(scene, vUv);
     vec4 bb = texture(backbuffer, vUv);
     bool draw = sceneCol.a == 1.;
-    float decay = 0.01;
+    float decay = 0.002;
+    float decay2 = 0.997;
     float fdbk = 0.;
+    float lastFdbk = bb.a;
     vec3 col;
     vec3 foreground = sceneCol.rgb;
     vec3 background = black;
     if(draw) {
         fdbk = 1.;
+        col = foreground;
     } else {
-        fdbk = bb.a - decay;
+        fdbk = lastFdbk - decay;
+        fdbk = lastFdbk * decay2;
+        col = mix(background, bb.rgb, fdbk);
     }
-    col = mix(background, foreground, fdbk);
-    gl_FragColor = vec4(fdbk);
+    
+    gl_FragColor = vec4(vec3(col), fdbk);
 }
 `;
 
@@ -353,11 +357,12 @@ uniform float time;
 uniform float gestureInd;
 
 void main()	{
-    vec4 col = vec4(vec3(sinN(time*gestureInd)), sinN(time*gestureInd*0.2));
-    gl_FragColor = vec4(1);
+    vec3 col = vec3(sinN(time* (3.+rand(gestureInd+1.))*PI + vUv.x*2.*PI)*0.8 + 0.2);
+    gl_FragColor = vec4(col, 1);
 }`;
 
 let compositingShader = glsl`
+
 varying vec2 vUv;
 uniform float time;
 uniform sampler2D scene0;
@@ -375,6 +380,8 @@ void main() {
     vec4 pick2 = col2.a > col3.a ? col2 : col3;
 
     vec4 pick = pick1.a > pick2.a ? pick1 : pick2;
+
+    float f = 5;
 
     gl_FragColor = pick;
 
