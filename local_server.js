@@ -104,3 +104,7 @@ wss.on("connection", function (socket) {
         raw: true
     });
 });
+
+udpPort.on("/playbackTrigger/1/1", (...args) => {
+    console.log("osc message", args);
+})

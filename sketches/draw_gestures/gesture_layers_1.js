@@ -38,11 +38,15 @@ let v3 = ({x, y}) => new THREE.Vector3(x, y, 0);
 
 let datGuiProps = {
     saveLoops: () => {saveLoops(recordingManager)},
-    loopSetName: "default_name"
+    loopSetName: "default_name",
+    warpAmt: 0.05,
+    decay2: 0.997
 };
 const gui = new dat.GUI();
 gui.add(datGuiProps, "saveLoops");
 gui.add(datGuiProps, "loopSetName");
+gui.add(datGuiProps, "warpAmt");
+gui.add(datGuiProps, "decay2");
 
 function createDebugCircle(uniforms, i){ // eslint-disable-line no-unused-vars
     // let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
@@ -113,10 +117,8 @@ function createGestureScene(gestureInd) {
 
     let loopScene = new THREE.Scene();
 
-    if(gestureInd == 0) {
-        let debugMesh = createDebugCircle(loopUniforms, gestureInd);
-        loopScene.add(debugMesh);
-    }
+    let debugMesh = createDebugCircle(loopUniforms, gestureInd);
+    loopScene.add(debugMesh);
 
     let loopTarget = newTarget(`loopTarget_${gestureInd}`);
     let feedbackTargets = [0,1].map(i => newTarget(`fdbk_${gestureInd}_${i}`));
@@ -130,6 +132,8 @@ function createGestureScene(gestureInd) {
 
         feedbackSceneInfo.uniforms.backbuffer.value = feedbackTargets[fdbkInd%2].texture;
         feedbackSceneInfo.uniforms.time.value = time;
+        feedbackSceneInfo.uniforms.warpAmt.value = datGuiProps.warpAmt;
+        feedbackSceneInfo.uniforms.decay2.value = datGuiProps.decay2; //todo: need a better way to map uniforms to sliders/OSC
         renderer.setRenderTarget(feedbackTargets[(fdbkInd+1)%2]);
         renderer.render(feedbackSceneInfo.scene, camera);
     }
@@ -149,6 +153,8 @@ function createFeedbackScene(gestureInd, loopTarget, fdbkTargets){
         backbuffer: { value: fdbkTargets[0].texture},
         scene:      { value: loopTarget.texture},
         time :      { value : 0},
+        decay2:     { value : 0.997},
+        warpAmt:   { value: 0.01},
         gestureInd: {value: gestureInd}
     } 
 
@@ -318,13 +324,15 @@ uniform float time;
 uniform sampler2D scene;
 uniform sampler2D backbuffer;
 uniform float gestureInd;
+uniform float warpAmt;
+uniform float decay2;
 
 void main() {
     vec4 sceneCol = texture(scene, vUv);
-    vec4 bb = texture(backbuffer, vUv);
+    vec2 warpN = mix(vUv, coordWarp(vUv, time).xy, warpAmt);
+    vec4 bb = texture(backbuffer, warpN);
     bool draw = sceneCol.a == 1.;
     float decay = 0.002;
-    float decay2 = 0.997;
     float fdbk = 0.;
     float lastFdbk = bb.a;
     vec3 col;
@@ -336,6 +344,7 @@ void main() {
     } else {
         fdbk = lastFdbk - decay;
         fdbk = lastFdbk * decay2;
+        fdbk = fdbk < 0.01 ? 0. : fdbk;
         col = mix(background, bb.rgb, fdbk);
     }
     
@@ -357,7 +366,8 @@ uniform float time;
 uniform float gestureInd;
 
 void main()	{
-    vec3 col = vec3(sinN(time* (3.+rand(gestureInd+1.))*PI + vUv.x*2.*PI)*0.8 + 0.2);
+    vec3 gestCol = hash(vec3(gestureInd*5.+5., 10, 20))*0.5 + 0.5;
+    vec3 col = vec3(sinN(time* (3.+rand(gestureInd+1.))*PI + vUv.x*2.*PI)*0.8 + 0.2) * gestCol;
     gl_FragColor = vec4(col, 1);
 }`;
 
