@@ -22,7 +22,7 @@ class DrawLoop {
             x: {min: -1, max: 1},
             y: {min: -1, max: 1},
         }
-        this.deltaScale = new THREE.Vector3(2, 2, 0);
+        this.deltaScale = new THREE.Vector3(1, 1, 0);
     }
 
     update(deltaTransform) {
@@ -73,8 +73,8 @@ class RecordingManager {
                 }
             }, 10);
 
-            oscH.on(`/${xyAddr}/${i}`, ([x, y]) => {
-                y = 1 - y; //touchOSC has y=0 at bottom instead of top
+            oscH.on(`/${xyAddr}/${i}`, ([x_in, y_in]) => {
+                let {x, y} = touchOSCRemap(x_in, y_in);
                 let rind = this.recordingIndex;
                 if(this.isRecording[rind]) {
                     if(this.resetDrawStart[rind]) {
@@ -85,10 +85,17 @@ class RecordingManager {
                         this.loops[rind].push({x: x - lt.x, y: y - lt.y});
                     }
                 }
-                this.lastTouch[i] = {x, y};
+                this.lastTouch[i] = {x, y}; //scaling touch starts from [0,1] to [-1,1]
+                //TODO: clean up touchOSC to three.js coordinate mapping (just make touchOSC template [-1, 1] with correct up/down?)
             }, 10);            
         })
     }
+}
+
+function touchOSCRemap(x, y) {
+    y = -1 + (-y)*2;
+    x = -1 + x*2;
+    return {x, y};
 }
 
 function saveLoops(recordingManager, loopSetName='default_name') {

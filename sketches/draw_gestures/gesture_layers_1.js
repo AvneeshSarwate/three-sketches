@@ -1,4 +1,5 @@
 import * as THREE from "../../node_modules/three/build/three.module.js";
+import { SimplexNoise } from "../../node_modules/three/examples/jsm/math/SimplexNoise.js"
 import Stats from "../../node_modules/three/examples/jsm/libs/stats.module.js";
 import header_code from "../../header_frag.js";
 
@@ -11,7 +12,7 @@ import {DrawLoop, RecordingManager, saveLoops} from '../../utilities/drawLoop.js
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
 const glsl = a => a[0];
 
-const SCALE = 2; //how much to downscale resolution for prototyping
+const SCALE = 1; //how much to downscale resolution for prototyping
 
 /**
  * Goal - brush-heads of the 4 different gesture-types/recording-slots are rendered in their own composite-scene with feedback.
@@ -48,14 +49,21 @@ gui.add(datGuiProps, "loopSetName");
 gui.add(datGuiProps, "warpAmt");
 gui.add(datGuiProps, "decay2");
 
+let simplex = new SimplexNoise();
+function timeNoise2d(xRand, yRand, time){
+    return {x: simplex.noise(xRand, time), y: simplex.noise(yRand, time)};
+}
+
+let rand = n => Math.abs(Math.sin(131233*n));
 function createDebugCircle(uniforms, i){ // eslint-disable-line no-unused-vars
     // let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
     // let material = new THREE.MeshBasicMaterial({color: '#FFFFFF'});
     // let mesh = new THREE.Mesh(circle, material);
     let mesh = createDrawLoopMesh(uniforms);
     setInterval(() => {
-        mesh.position.x = Math.sin(Date.now()/1000 + i);
-        mesh.position.y = Math.cos(Date.now()/1000 + i);
+        let pos = timeNoise2d(i+1, 10*(i+1), Date.now()/1000 * 0.3);
+        mesh.position.x = pos.x;
+        mesh.position.y = pos.y;
     }, 20)
     return mesh;
 }
@@ -86,7 +94,7 @@ function instantiateDrawLoopMaterial() {
 
 
 function createDrawLoopMesh(uniforms) {
-    let circle = new THREE.CircleBufferGeometry(0.04, 30, 30);
+    let circle = new THREE.CircleBufferGeometry(0.1, 30, 30);
     let material = drawLoopMaterial.clone();
     Object.assign(material.uniforms, uniforms);
     let mesh = new THREE.Mesh(circle, material);
@@ -109,6 +117,7 @@ function createTargetSelector() {
     gui.add(datGuiProps, 'target', Object.keys(targets));
 }
 
+let debugCircles = false;
 function createGestureScene(gestureInd) {
     let loopUniforms = {
         time: {value: 0},
@@ -117,8 +126,10 @@ function createGestureScene(gestureInd) {
 
     let loopScene = new THREE.Scene();
 
-    let debugMesh = createDebugCircle(loopUniforms, gestureInd);
-    loopScene.add(debugMesh);
+    if(debugCircles) {
+        let debugMesh = createDebugCircle(loopUniforms, gestureInd);
+        loopScene.add(debugMesh);
+    }
 
     let loopTarget = newTarget(`loopTarget_${gestureInd}`);
     let feedbackTargets = [0,1].map(i => newTarget(`fdbk_${gestureInd}_${i}`));
@@ -345,7 +356,7 @@ void main() {
         fdbk = lastFdbk - decay;
         fdbk = lastFdbk * decay2;
         fdbk = fdbk < 0.01 ? 0. : fdbk;
-        col = mix(background, bb.rgb, fdbk);
+        col = mix(background, bb.rgb, fdbk < 0.01 ? 0.: 1.);
     }
     
     gl_FragColor = vec4(vec3(col), fdbk);
@@ -367,7 +378,7 @@ uniform float gestureInd;
 
 void main()	{
     vec3 gestCol = hash(vec3(gestureInd*5.+5., 10, 20))*0.5 + 0.5;
-    vec3 col = vec3(sinN(time* (3.+rand(gestureInd+1.))*PI + vUv.x*2.*PI)*0.8 + 0.2) * gestCol;
+    vec3 col = quant(vUv.y, 10.)  * gestCol;
     gl_FragColor = vec4(col, 1);
 }`;
 
