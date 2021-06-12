@@ -338,9 +338,22 @@ uniform float gestureInd;
 uniform float warpAmt;
 uniform float decay2;
 
+vec2 rowSplit(vec2 vUv, float t, float num, float amt) {
+    float dir = mod(quant(vUv.y, num) * num, 2.) < 0.1 ? -amt : amt;
+    return vUv + vec2(dir, 0.);
+}
+
+vec2 getWarpN() {
+    if(gestureInd < 2.) {
+        return mix(vUv, coordWarp(vUv, time).xy, warpAmt);
+    } else {
+        return rowSplit(vUv, time, 10., warpAmt * 0.2);
+    }
+}
+
 void main() {
     vec4 sceneCol = texture(scene, vUv);
-    vec2 warpN = mix(vUv, coordWarp(vUv, time).xy, warpAmt);
+    vec2 warpN = getWarpN();
     vec4 bb = texture(backbuffer, warpN);
     bool draw = sceneCol.a == 1.;
     float decay = 0.002;
@@ -377,7 +390,7 @@ uniform float time;
 uniform float gestureInd;
 
 void main()	{
-    vec3 gestCol = hash(vec3(gestureInd*5.+5., 10, 20))*0.5 + 0.5;
+    vec3 gestCol = hash(vec3(gestureInd*5.+5., 12, 20))*0.5 + 0.5;
     vec3 col = quant(vUv.y, 10.)  * gestCol;
     gl_FragColor = vec4(col, 1);
 }`;
