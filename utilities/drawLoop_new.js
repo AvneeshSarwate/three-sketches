@@ -58,6 +58,8 @@ class RecordingManager {
         this.recordingIndex = 0;
         [1, 2, 3, 4].forEach(i => {
 
+            //TODO: refactor index and addresses to new touchOSC
+
             oscH.on(`/${recordAddr}/${i}/1`, ([onOff]) => {
                 if(onOff){
                     this.isRecording[i] = true;
