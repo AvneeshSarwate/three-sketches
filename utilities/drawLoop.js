@@ -1,4 +1,4 @@
-import {oscV, oscH} from '../../utilities/oscManager.js';
+import {oscV, oscH} from './oscManager.js';
 import * as THREE from "../node_modules/three/build/three.module.js";
 
 let mod = function(t, n) {
@@ -51,11 +51,16 @@ class DrawLoop {
 class RecordingManager {
     constructor(xyAddr, recordAddr) {
         this.lastTouch = {};
+        this.last
         this.isRecording = {}
         this.resetDrawStart = {};
         this.drawStart = {}
         this.loops = {};
         this.recordingIndex = 0;
+
+        this.launchPoints = {};
+        this.addingLaunchPoints = {};
+
         [1, 2, 3, 4].forEach(i => {
 
             oscH.on(`/${recordAddr}/${i}/1`, ([onOff]) => {
@@ -89,14 +94,22 @@ class RecordingManager {
                 }
                 this.lastTouch[i] = {x, y, ts: Date.now()}; //scaling touch starts from [0,1] to [-1,1]
                 //TODO: clean up touchOSC to three.js coordinate mapping (just make touchOSC template [-1, 1] with correct up/down?)
-            }, 10);            
+            }, 10);   
+            
+            oscH.on(`/modeSelector/${i}/1`, ([onOff]) => {
+
+            });
         })
     }
 }
 
 /**
  * fix touchOSC but where XY pad sends extra message preceding the "true" first message on first touch.
- * Extra message has the correct x value but y value from the last touch
+ * Extra message has the correct x value but y value from the last touch.
+ * 
+ * TODO - change this to throw out every even-index message - an erroneous duplicate
+ *        as described above precedes almost? evey message in the new touchOSC xy currently.
+ *        (Howevemr the error duplicates are)
  */
 function fixNewTouchOSCBug(loopDeltas) {
     if(loopDeltas[0].dt < 10 && loopDeltas[0].y == 0) {
