@@ -1,10 +1,14 @@
 import { Voronoi } from "../../libs/rhill-voronoi-core.js"
+
 import { SimplexNoise } from "../../node_modules/three/examples/jsm/math/SimplexNoise.js"
+import * as dat from '../../node_modules/dat.gui/build/dat.gui.module.js';
 import * as THREE from "../../node_modules/three/build/three.module.js";
-import { getCellPoints } from "../../utilities/voronoi_manager.js";
-import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import { Earcut } from "../../node_modules/three/src/extras/Earcut.js";
 import Stats from "../../node_modules/three/examples/jsm/libs/stats.module.js";
+
+import { getCellPoints } from "../../utilities/voronoi_manager.js";
+import { htmlToElement } from "../../utilities/utilityFunctions.js"
+
 import header_code from "../../header_frag.js";
 //template literal function for use with https://marketplace.visualstudio.com/items?itemName=boyswan.glsl-literal
 //backup fork at https://github.com/AvneeshSarwate/vscode-glsl-literal
@@ -15,6 +19,12 @@ function range(size, startAt = 0) {
 }
 
 let randColor = () =>  '#'+Math.floor(Math.random()*16777215).toString(16);
+
+const gui = new dat.GUI();
+const guiParams = {pause: false, liveMouse: true, colorSelection: true};
+gui.add(guiParams, 'pause');
+gui.add(guiParams, 'liveMouse');
+gui.add(guiParams, 'colorSelection');
 
 let simplex = new SimplexNoise();
 let numSites = 3**2;
@@ -80,15 +90,18 @@ function createVoronoiScene() {
         uniforms: { 
             time: {value: 0},
             ind:  {value: 0},
-            video: {value: Object.values(videos)[0].texture}
-        }
+            video: {value: Object.values(videos)[0].texture},
+            isSelected: {value: false},
+        },
+        side: THREE.DoubleSide
     })
     vsc.materials = range(numSites).map((i) => {
         let mat = baseMaterial.clone();
         mat.uniforms = { 
             time: {value: Math.PI/2},
             ind:  {value: i},
-            video: {value: Object.values(videos)[0].texture}
+            video: {value: Object.values(videos)[0].texture},
+            isSelected: {value: false}
         };
         return mat
     });
@@ -205,11 +218,17 @@ function updateGeometryFromVoronoiCell(cell, bufferGeom, ind, initialCreation=fa
     if(initialCreation) {
         bufferGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(numVert * 3), 3));
         bufferGeom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(numVert * 2), 2));
+        // bufferGeom.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(numVert * 3), 3));
+        //todo - create normals to allow ray-intersection to work on a buffer geometry
     } else {
         bufferGeom.getAttribute('position').copyArray(cellBuffers.cell3d);
         bufferGeom.getAttribute('uv').copyArray(cellBuffers.uvPts);
         bufferGeom.attributes.position.needsUpdate = true;
         bufferGeom.attributes.uv.needsUpdate = true;
+
+        //todo - why does this need to be calculated when it looks like it's calculated internally if it doesnt 
+        //exist by raycaster.intersectObject?
+        bufferGeom.computeBoundingSphere(); 
     }
 }
 
@@ -217,11 +236,33 @@ window.onkeypress = e => {
     animate();
 }
 
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+window.setMouse = (a, b) => {
+    mouse.x = a;
+    mouse.y = b;
+}
+window.mouse = mouse;
+
+function onMouseMove( event ) {
+
+	// calculate mouse position in normalized device coordinates
+	// (-1 to +1) for both components
+
+    if(guiParams.liveMouse) {
+    	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+	    mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+    }
+}
+
 function init() {
 
     createVoronoiScene();
 
-    cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    // cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    cam = new THREE.PerspectiveCamera( 90, 1, 0.1, 1000 );
+    cam.position.z = 1;
+    window.camera = cam;
 
     const container = document.getElementById("container");
 
@@ -238,6 +279,7 @@ function init() {
     container.appendChild(stats.dom);
 
     window.addEventListener("resize", onWindowResize, false);
+    window.addEventListener( 'mousemove', onMouseMove, false );
 }
 
 function onWindowResize() {
@@ -248,17 +290,38 @@ function timeNoise2d(xRand, yRand, time){
     return  vec2(simplex.noise(xRand, time),  simplex.noise(yRand, time));
 }
 
+function colorMouseOverObject() {
+    // update the picking ray with the camera and mouse position
+	raycaster.setFromCamera( mouse, cam );
+
+    // calculate objects intersecting the picking ray
+    voronoiSceneComponents.meshes.forEach(mesh => {
+        mesh.material.uniforms.isSelected.value = false;
+    })
+
+    if(guiParams.colorSelection) {
+        const intersects = raycaster.intersectObjects( voronoiSceneComponents.meshes );
+        console.log("num intersects", intersects.length)
+        intersects.forEach(intsec => {
+            intsec.object.material.uniforms.isSelected.value = true;
+        })
+    }
+}
+
 function animate() {
     requestAnimationFrame(animate);
 
+    colorMouseOverObject();
+
     renderer.render(voronoiSceneComponents.scene, cam);
 
-    time = Date.now() / 1000 - startTime;
+    if(!guiParams.pause) time = Date.now() / 1000 - startTime;
    
     updateVoronoiScene(time * 0.08);
 
     stats.update();
 }
+
 
 export {
     init,
@@ -291,12 +354,13 @@ varying vec2 vUv;
 uniform float time;
 uniform float ind;
 uniform sampler2D video;
+uniform bool isSelected;
 
 void main()	{
     float t = time*.03; //todo - why does commenting this line out stop "time" uniform value from being bound?
     float col = pow(1. - abs(distance(vUv, vec2(0.5)) - sinN(t+ind)/2.)*4., 4.);
     float col2 = pow(1. - distance(vec2(sinN(t), cosN(t)), vUv), 4.);
     vec4 vid = texture(video, mix(vUv, vec2(0.5), 0.4));
-    gl_FragColor = vid; //vec4(vec3(col), 1.);
+    gl_FragColor = isSelected ? vec4(red, 1.) : vid; //vec4(vec3(col), 1.);
 }`;
 
