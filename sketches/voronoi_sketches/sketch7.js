@@ -2,6 +2,7 @@ import { Voronoi } from "../../libs/rhill-voronoi-core.js"
 import { SimplexNoise } from "../../node_modules/three/examples/jsm/math/SimplexNoise.js"
 import * as THREE from "../../node_modules/three/build/three.module.js";
 import { getCellPoints } from "../../utilities/voronoi_manager.js";
+import { htmlToElement } from "../../utilities/utilityFunctions.js"
 import { Earcut } from "../../node_modules/three/src/extras/Earcut.js";
 import Stats from "../../node_modules/three/examples/jsm/libs/stats.module.js";
 import header_code from "../../header_frag.js";
@@ -17,7 +18,9 @@ let randColor = () =>  '#'+Math.floor(Math.random()*16777215).toString(16);
 
 let simplex = new SimplexNoise();
 let numSites = 3**2;
-let numVert = numSites + 8; //each polygon buffer will have to have enough verts to account for each other polygon and the bounding box sides
+//each polygon buffer will have to have enough verts to account for each other polygon and the bounding box sides
+//todo - get this number right wrt number of sites - currently a guess
+let numVert = numSites + 8*2; 
 let voronoi = new Voronoi(); 
 let voronoiSceneComponents = {
     sites: [],
@@ -37,7 +40,7 @@ let voronoiSceneComponents = {
 
 let videos = {
     vidKey:  {
-        uri: 'vidFileName',
+        uri: '../../media_assets/eye_movement_short_small2.mp4',
         texture: null
     }
 };
@@ -135,7 +138,7 @@ let pf4 = (i, time) => {
 
 function updateVoronoiScene(t) {
     let vsc = voronoiSceneComponents;
-    vsc.sites.forEach((s, i) => Object.assign( s,  pf(i*1.3, t*0.03)));
+    vsc.sites.forEach((s, i) => Object.assign( s,  pf2(i, t*(1+i*0.4)*4)));
     // Object.assign(vsc.sites[0], {x: 0, y: 0});
     
     try {
@@ -293,7 +296,7 @@ void main()	{
     float t = time*.03; //todo - why does commenting this line out stop "time" uniform value from being bound?
     float col = pow(1. - abs(distance(vUv, vec2(0.5)) - sinN(t+ind)/2.)*4., 4.);
     float col2 = pow(1. - distance(vec2(sinN(t), cosN(t)), vUv), 4.);
-    vec4 vid = texture(video, vUv);
+    vec4 vid = texture(video, mix(vUv, vec2(0.5), 0.4));
     gl_FragColor = vid; //vec4(vec3(col), 1.);
 }`;
 
